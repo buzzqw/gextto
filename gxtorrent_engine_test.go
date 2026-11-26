@@ -1042,6 +1042,79 @@ func TestGxDeferredRestartWaitsForMoves(t *testing.T) {
 	}
 }
 
+func TestGxDeferredRestartTreatsUnknownMovesAsInProgress(t *testing.T) {
+	var failing atomic.Bool
+	failing.Store(true)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if failing.Load() {
+			http.Error(w, "busy", http.StatusServiceUnavailable)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"moving": 0})
+	}))
+	defer server.Close()
+	sleeper := exec.Command("sleep", "30")
+	if err := sleeper.Start(); err != nil {
+		t.Skip("sleep unavailable")
+	}
+	go func() { _ = sleeper.Wait() }()
+	defer func() { _ = sleeper.Process.Kill() }()
+
+	previousEvery, previousLimit := gxReplaceCheckEvery, gxReplaceUnknownLimit
+	gxReplaceCheckEvery, gxReplaceUnknownLimit = 20*time.Millisecond, time.Hour
+	defer func() { gxReplaceCheckEvery, gxReplaceUnknownLimit = previousEvery, previousLimit }()
+	e := &gxTorrentEngine{
+		settings:       gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:         server.Client(),
+		supervisorStop: make(chan struct{}),
+	}
+	if _, err := e.movesInProgress(); err == nil {
+		t.Fatal("a failing stats call must be reported, not read as zero moves")
+	}
+	done := make(chan struct{})
+	go func() { e.replaceWhenIdle(sleeper.Process.Pid, "test"); close(done) }()
+
+	time.Sleep(200 * time.Millisecond)
+	if !gxPidAlive(sleeper.Process.Pid) {
+		t.Fatal("the daemon was stopped while it could not report its moves")
+	}
+	failing.Store(false)
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the daemon was not restarted once it reported no moves")
+	}
+}
+
+func TestGxDeferredRestartGivesUpOnASilentDaemon(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "busy", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	sleeper := exec.Command("sleep", "30")
+	if err := sleeper.Start(); err != nil {
+		t.Skip("sleep unavailable")
+	}
+	go func() { _ = sleeper.Wait() }()
+	defer func() { _ = sleeper.Process.Kill() }()
+
+	previousEvery, previousLimit := gxReplaceCheckEvery, gxReplaceUnknownLimit
+	gxReplaceCheckEvery, gxReplaceUnknownLimit = 20*time.Millisecond, 100*time.Millisecond
+	defer func() { gxReplaceCheckEvery, gxReplaceUnknownLimit = previousEvery, previousLimit }()
+	e := &gxTorrentEngine{
+		settings:       gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:         server.Client(),
+		supervisorStop: make(chan struct{}),
+	}
+	done := make(chan struct{})
+	go func() { e.replaceWhenIdle(sleeper.Process.Pid, "test"); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("a daemon that never reports its moves must be replaced after the limit")
+	}
+}
+
 func TestGxTorrentCopiesUseTheTorrentName(t *testing.T) {
 	dir := t.TempDir()
 	payload := []byte("d8:announce3:url4:infod6:lengthi1e4:name14:Show.S01E01.mk12:piece lengthi16384e6:pieces0:ee")

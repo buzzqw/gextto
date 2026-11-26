@@ -53,7 +53,7 @@ func (d *Daemon) settingFloat(key string, fallback float64) float64 {
 	if d.opts.Settings == nil {
 		return fallback
 	}
-	if v, err := strconv.ParseFloat(strings.TrimSpace(d.opts.Settings.Get(key, "")), 64); err == nil {
+	if v, ok := parseFiniteFloat(d.opts.Settings.Get(key, "")); ok {
 		return v
 	}
 	return fallback

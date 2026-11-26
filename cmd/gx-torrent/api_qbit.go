@@ -1059,7 +1059,7 @@ func qbitApplyAddLimits(r *http.Request, req *addRequest) {
 		}
 	}
 	if raw := strings.TrimSpace(r.FormValue("ratioLimit")); raw != "" {
-		if v, err := strconv.ParseFloat(raw, 64); err == nil {
+		if v, ok := parseFiniteFloat(raw); ok {
 			switch {
 			case v == -2:
 				req.SeedRatio = -1
@@ -1963,12 +1963,12 @@ func (d *Daemon) setQbitShareLimits(hash string, ratioPtr *float64, minutesPtr, 
 // inactive-seeding limits. -2 means "use the global setting", -1 "infinite"
 // (or disabled for the inactive limit), >=0 is an exact number of minutes.
 func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request) {
-	ratio, rerr := strconv.ParseFloat(strings.TrimSpace(r.FormValue("ratioLimit")), 64)
+	ratio, ratioOK := parseFiniteFloat(r.FormValue("ratioLimit"))
 	minutes, merr := strconv.ParseInt(strings.TrimSpace(r.FormValue("seedingTimeLimit")), 10, 64)
 	inactive, ierr := strconv.ParseInt(strings.TrimSpace(r.FormValue("inactiveSeedingTimeLimit")), 10, 64)
 	d.applyQbitTorrentAction(w, r, "setShareLimits", func(hash string) error {
 		var ratioPtr *float64
-		if rerr == nil {
+		if ratioOK {
 			switch {
 			case ratio >= 0:
 				ratioPtr = &ratio

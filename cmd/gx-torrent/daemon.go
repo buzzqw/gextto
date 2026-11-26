@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -2378,6 +2379,9 @@ func kibOrInherit(value *int64) int64 {
 // setLimits stores the per-torrent seed policy and, when given, the speed
 // limits (KiB/s), applying the latter to the running torrent at once.
 func (d *Daemon) setLimits(key string, download, upload *int64, ratio *float64, days *int64) error {
+	if ratio != nil && (math.IsNaN(*ratio) || math.IsInf(*ratio, 0)) {
+		return errors.New("seed ratio must be a finite number")
+	}
 	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
 		if download != nil {
 			value := *download
@@ -3086,7 +3090,8 @@ func (d *Daemon) stats() daemonStats {
 		case "stalled":
 			out.Stalled++
 		case "moving":
-			out.Moving++
+			// Counted from d.moving below: the published views can be a
+			// tick old, and a move that just started must already count.
 		case "paused":
 			if view.AutoManaged {
 				out.Queued++
@@ -3189,6 +3194,9 @@ func (d *Daemon) stats() daemonStats {
 		out.Session["lsd_peers_found"] = out.LSD.PeersFound
 	}
 	out.Lifetime = d.lifetimeLocked()
+	// The live set, not the views: Gextto reads this number before stopping
+	// the daemon, and a stale zero would let it cut a copy to the library.
+	out.Moving = len(d.moving)
 	return out
 }
 

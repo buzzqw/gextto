@@ -139,10 +139,25 @@ func (p payload) move(savePath, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
 	}
-	done := make([]step, 0, len(steps))
+	// Two phases, so a failure can always be undone. First every file reaches
+	// the destination: a rename on the same filesystem, a copy (the source
+	// stays) across filesystems. Only when all of them are there are the
+	// copied sources removed. A failure half way renames back what was renamed
+	// and deletes what was copied, leaving the payload whole at the source,
+	// where the state still points.
+	type done struct {
+		step
+		copied bool
+	}
+	completed := make([]done, 0, len(steps))
 	undo := func() {
-		for i := len(done) - 1; i >= 0; i-- {
-			_ = os.Rename(done[i].to, done[i].from)
+		for i := len(completed) - 1; i >= 0; i-- {
+			c := completed[i]
+			if c.copied {
+				_ = os.Remove(c.to)
+			} else {
+				_ = os.Rename(c.to, c.from)
+			}
 		}
 	}
 	for _, s := range steps {
@@ -150,18 +165,22 @@ func (p payload) move(savePath, dest string) error {
 			undo()
 			return err
 		}
-		err := os.Rename(s.from, s.to)
+		err := renamePayloadFile(s.from, s.to)
+		copied := false
 		if err != nil && isCrossDevice(err) {
-			err = copyThenRemove(s.from, s.to)
-			if err == nil {
-				continue // a copy cannot be undone by a rename: keep it
-			}
+			err = copyInto(s.from, s.to)
+			copied = err == nil
 		}
 		if err != nil {
 			undo()
 			return err
 		}
-		done = append(done, s)
+		completed = append(completed, done{step: s, copied: copied})
+	}
+	for _, c := range completed {
+		if c.copied {
+			removeMovedSource(c.from)
+		}
 	}
 	pruneEmptyDirs(savePath, p.files)
 	return nil
@@ -181,9 +200,13 @@ func (p payload) discard(savePath, dest string, guard func(string) error) error 
 	return os.MkdirAll(dest, 0o755)
 }
 
-// copyThenRemove copies one file across filesystems through a partial name,
-// then removes the source.
-func copyThenRemove(from, to string) error {
+// renamePayloadFile is os.Rename; a test swaps it to act out a move across
+// filesystems on a single one.
+var renamePayloadFile = os.Rename
+
+// copyInto copies one file to to through a temporary name, so to only ever
+// appears complete. The source is left in place.
+func copyInto(from, to string) error {
 	partial := to + ".gxpart"
 	_ = os.Remove(partial)
 	if err := copyTree(from, partial); err != nil {
@@ -194,7 +217,17 @@ func copyThenRemove(from, to string) error {
 		_ = os.Remove(partial)
 		return err
 	}
-	return os.Remove(from)
+	return nil
+}
+
+// removeMovedSource drops a source whose copy is already complete at the
+// destination. Failing to remove it does not fail the move: the data is whole
+// where the torrent now points, and reporting an error here would leave the
+// state on a source that is partly gone. The leftover only takes space.
+func removeMovedSource(path string) {
+	if err := os.RemoveAll(path); err != nil {
+		logfWarn("the data was copied to its new place, but the old copy could not be removed: %s (%v)", path, err)
+	}
 }
 
 // pruneEmptyDirs removes the folders under base that held the files and are now

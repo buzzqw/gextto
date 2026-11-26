@@ -209,7 +209,7 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	// Global seeding limits (settings.json, enforced by the queue tick). The
 	// per-torrent limits set through the API always win.
 	store.Set(maxRatioEnabledKey, strconv.FormatBool(formBool(r, "max-ratio-enabled")))
-	if v, err := strconv.ParseFloat(strings.TrimSpace(r.FormValue("max-ratio")), 64); err == nil && v >= 0 {
+	if v, ok := parseFiniteFloat(r.FormValue("max-ratio")); ok && v >= 0 {
 		store.Set(maxRatioKey, strconv.FormatFloat(v, 'f', -1, 64))
 	}
 	act := "0"

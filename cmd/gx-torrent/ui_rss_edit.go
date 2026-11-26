@@ -562,8 +562,8 @@ func mibToBytes(raw string) int64 {
 	if raw == "" {
 		return 0
 	}
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil || value <= 0 {
+	value, ok := parseFiniteFloat(raw)
+	if !ok || value <= 0 {
 		return 0
 	}
 	return int64(value * 1024 * 1024)

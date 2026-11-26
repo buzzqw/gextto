@@ -130,7 +130,11 @@ Code:
      options (`fingerprint` in `/api/v1/health`): peers, queue and transfers
      continue without interruption. If the binary or a startup option have
      changed, Gextto stops it with SIGTERM (45 seconds of grace, the engine saves the
-     resume data) and starts a new one. `make build` replaces
+     resume data) and starts a new one. A daemon with a move to the library in
+     progress is kept until the move ends; one that cannot say whether it is
+     moving (`/api/v1/stats` fails) counts as moving, and is replaced anyway only
+     after 10 minutes of silence. The `moving` count comes from the live set of
+     moves, not from the last published list. `make build` replaces
      `bin/gx-torrent` only if its code has changed
      (`bin/gx-torrent.code-sha256`), so an update that touches only
      gexttod does not stop downloads;
@@ -2499,7 +2503,13 @@ this removes one fsync per piece write (measurements in
 3. the content is moved, with `rename` or with copy and removal if
    the filesystem changes (via `.gxpart` files). Each copied file must have
    exactly the source's size: a short copy (the source shrank meanwhile) is
-   discarded and the move fails, leaving the original where it was;
+   discarded and the move fails, leaving the original where it was. Loose files
+   move in two phases: all of them reach the destination first, and only then
+   are the copied sources removed, so a failure half way deletes the copies
+   and renames back the renamed files, and the payload stays whole at the
+   source. A source that cannot be removed after a complete copy does not
+   fail the move (the data is whole where the torrent now points): it is
+   logged and left behind;
 4. the symlink is re-pointed atomically;
 5. the torrent starts again.
 

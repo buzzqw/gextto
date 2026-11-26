@@ -225,10 +225,22 @@ func formBool(r *http.Request, key string) bool {
 }
 
 func formFloat(r *http.Request, key string, fallback float64) float64 {
-	if value, err := strconv.ParseFloat(strings.TrimSpace(r.FormValue(key)), 64); err == nil {
+	if value, ok := parseFiniteFloat(r.FormValue(key)); ok {
 		return value
 	}
 	return fallback
+}
+
+// parseFiniteFloat reads a decimal number and refuses NaN and the infinities,
+// which strconv accepts: a non-finite ratio cannot be written to the state
+// file (JSON has no spelling for it), so letting one in would make every later
+// save fail, not just the one that carried it.
+func parseFiniteFloat(raw string) (float64, bool) {
+	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, false
+	}
+	return value, true
 }
 
 func formInt(r *http.Request, key string, fallback int64) int64 {

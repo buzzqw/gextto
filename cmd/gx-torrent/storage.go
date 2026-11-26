@@ -303,7 +303,8 @@ func movePayload(savePath, dest, name string) error {
 		_ = os.RemoveAll(partial)
 		return err
 	}
-	return os.RemoveAll(source)
+	removeMovedSource(source)
+	return nil
 }
 
 // discardEmptyPayload drops the files of a torrent with nothing downloaded

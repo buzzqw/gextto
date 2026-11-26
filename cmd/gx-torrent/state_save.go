@@ -24,6 +24,7 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"time"
 )
@@ -171,6 +172,7 @@ func (d *Daemon) prepareSnapshotLocked() (uint64, *persistedState) {
 // encodeSnapshot marshals a snapshot taken under the daemon lock. The state
 // can keep changing while this runs without the handlers waiting for it.
 func encodeSnapshot(snapshot *persistedState) ([]byte, error) {
+	dropNonFiniteRatios(snapshot)
 	data, err := json.MarshalIndent(snapshot, "", "  ")
 	if err != nil {
 		logfError("cannot encode state: %v", err)
@@ -205,4 +207,20 @@ func (d *Daemon) writeState(seq uint64, data []byte) error {
 	d.stateWritten = seq
 	d.stateWrites.Add(1)
 	return nil
+}
+
+// dropNonFiniteRatios resets a NaN or infinite seed ratio to "inherit the
+// global one" in a snapshot about to be written. The API refuses such values
+// now, but a state that already holds one would otherwise fail every save
+// from here on (JSON cannot encode it). The snapshot is a clone, so the live
+// state is left to the next accepted change.
+func dropNonFiniteRatios(snapshot *persistedState) {
+	if snapshot == nil {
+		return
+	}
+	for _, meta := range snapshot.Torrents {
+		if meta != nil && (math.IsNaN(meta.SeedRatio) || math.IsInf(meta.SeedRatio, 0)) {
+			meta.SeedRatio = -1
+		}
+	}
 }

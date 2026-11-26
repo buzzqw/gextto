@@ -246,7 +246,8 @@ func relocateFile(from, to string) error {
 		_ = os.Remove(to)
 		return err
 	}
-	return os.Remove(from)
+	removeMovedSource(from)
+	return nil
 }
 
 // selectOnlyJob carries a BEP 53 magnet "so" selection from the tick loop

@@ -544,12 +544,18 @@ func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
 		}
 		return
 	}
-	if moving := e.movesInProgress(); moving > 0 && gxPidAlive(health.Pid) {
+	if moving, err := e.movesInProgress(); (moving > 0 || err != nil) && gxPidAlive(health.Pid) {
 		// Stopping it now would cut a copy to the library in half: keep the
-		// old daemon until its moves are done, then replace it.
+		// old daemon until its moves are done, then replace it. A daemon that
+		// cannot say whether it is moving counts as moving: guessing "no"
+		// is the one answer that can break a copy.
 		e.process = adoptGxProcess(health.Pid)
 		e.setStartupNote(fmt.Sprintf("%s (restarts once its moves in progress finish)", health.Version))
-		logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once %s to the library %s", health.Version, countLabel(moving, "move", "moves"), pluralWord(moving, "finishes", "finish")))
+		if err != nil {
+			logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once it confirms that no move to the library is in progress", health.Version))
+		} else {
+			logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once %s to the library %s", health.Version, countLabel(moving, "move", "moves"), pluralWord(moving, "finishes", "finish")))
+		}
 		go e.replaceWhenIdle(health.Pid, health.Version)
 		return
 	}
@@ -576,19 +582,25 @@ func (e *gxTorrentEngine) StartupNote() string {
 	return e.startupNote
 }
 
-// movesInProgress returns how many storage moves the daemon is running.
-func (e *gxTorrentEngine) movesInProgress() int {
+// movesInProgress returns how many storage moves the daemon is running. An
+// error means the number is unknown: the caller must not read it as zero.
+func (e *gxTorrentEngine) movesInProgress() (int, error) {
 	var stats struct {
 		Moving int `json:"moving"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/stats", nil, "", &stats); err != nil {
-		return 0
+		return 0, err
 	}
-	return stats.Moving
+	return stats.Moving, nil
 }
 
 // gxReplaceCheckEvery is how often a deferred daemon restart checks the moves.
 var gxReplaceCheckEvery = 15 * time.Second
+
+// gxReplaceUnknownLimit bounds how long a deferred restart waits on a daemon
+// that keeps failing to report its moves: such a daemon is not answering, and
+// waiting for ever would keep an outdated program running indefinitely.
+var gxReplaceUnknownLimit = 10 * time.Minute
 
 // replaceWhenIdle stops an outdated adopted daemon once it has no move in
 // progress; the supervisor then starts the current one.
@@ -596,6 +608,7 @@ func (e *gxTorrentEngine) replaceWhenIdle(pid int, version string) {
 	defer recoverGoroutine("gx-torrent deferred restart")
 	ticker := time.NewTicker(gxReplaceCheckEvery)
 	defer ticker.Stop()
+	var unknownSince time.Time
 	for {
 		select {
 		case <-e.supervisorStop:
@@ -605,7 +618,17 @@ func (e *gxTorrentEngine) replaceWhenIdle(pid int, version string) {
 		if !gxPidAlive(pid) {
 			return
 		}
-		if e.movesInProgress() > 0 {
+		moving, err := e.movesInProgress()
+		if err != nil {
+			if unknownSince.IsZero() {
+				unknownSince = time.Now()
+			}
+			if time.Since(unknownSince) < gxReplaceUnknownLimit {
+				continue
+			}
+			logging.Warn(fmt.Sprintf("gx-torrent %s has not reported its moves for %s: restarting it anyway", version, gxReplaceUnknownLimit), "error", err.Error())
+		} else if moving > 0 {
+			unknownSince = time.Time{}
 			continue
 		}
 		e.processMu.Lock()
