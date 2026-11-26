@@ -1036,6 +1036,8 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .data-table.trash-table > thead > tr > th:nth-child(3) { width: 96px; }
 .data-table.trash-table > thead > tr > th:last-child { width: 190px; }
 .data-table.trash-table > tbody > tr > td.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.data-table.trash-table .row-actions { flex-wrap: wrap; min-width: 0; white-space: normal; }
+.data-table.trash-table .row-actions form { display: inline-flex; }
 .table-sort-button {
   display: inline-flex;
   align-items: center;
