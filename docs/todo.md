@@ -24,7 +24,7 @@ still be true after the item lands does not belong here.
 - **Persistence transactions**: replace the remaining whole-library read-modify-write paths with patch transactions or revisions. Gate: concurrent save tests beyond the series/movie endpoints.
 - **Resume journal evolution**: associate layout generation and checksums with persisted piece state, and rehash selectively after unclean shutdown or sync failure. Gate: crash-consistency and resume-performance tests.
 - **Lifecycle and persistence boundary evolution**: consolidate task/process supervision and repository transactions behind explicit unit-of-work and shutdown phases. Gate: lifecycle tests covering HTTP, jobs, watchdog, crossnet and managed processes.
-- **Release provenance evolution**: publish signed, immutable build-once artifacts and promote the same verified bytes to stable, and state which external metadata services a run contacts. Gate: signature verification, promotion tests and a documented dependency list.
+- **Release provenance evolution**: publish signed, immutable build-once artifacts and promote the same verified bytes to stable. The declared dependency report and the reproducibility recipe are already in place. Gate: signature verification and promotion tests.
 
 - **Focus and clicks still lost across some HTMX swaps**: the torrent list now restores
   focus by id per swap target, and the drawer opener is looked up again, but polling still
