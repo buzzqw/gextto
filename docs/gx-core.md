@@ -351,7 +351,7 @@ third-party work is rewritten rather than copied.
 
 - [`GXCORE-MANUAL.it.md`](GXCORE-MANUAL.it.md) / [`GXCORE-MANUAL.en.md`](GXCORE-MANUAL.en.md) — user manual with real screenshots, from the Docker start to Series & movies, profiles and integrations.
 - [`docs/gx-torrent.md`](gx-torrent.md) — technical reference of the daemon and the engine.
-- [`docs/todo.md`](todo.md) — the open items and the gate that unblocks each.
+- [`docs/todo.md`](todo.md) — the open items in priority order and the gate that unblocks each.
 - [`docs/measurements.md`](measurements.md) — the harnesses, the numbers and how they are
   taken.
 - [`docs/bep.md`](bep.md) — BEP status and the BitTorrent v2 rules.

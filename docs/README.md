@@ -38,7 +38,7 @@ change, so this index and the site are never two different texts.
 | [TUI](tui.md) | Terminal client and keyboard shortcuts. |
 | [Developers](DEVELOPERS.md) | Build, tests and contributor conventions. |
 | [Architecture](ARCHITECTURE.md) | Map of the code folders and files. |
-| [Open items](todo.md) | The maintained TODO list: what is not done and the gate that unblocks it. |
+| [Open items](todo.md) | The maintained TODO list: what is not done, in the order it will be done, and the gate that unblocks each item. |
 | [Measurements and benchmarks](measurements.md) | gx-torrent compared with qBittorrent, Transmission, Deluge, rain and anacrolix/torrent, how to repeat the comparison, which client fits which need, then Gextto's own footprint, and the build and test times. |
 | [gx-torrent engine](gx-torrent.md) | Technical document of the pure-Go torrent engine (gx-core, daemon, adapter). |
 | [eD2k e Kad con aMule o emule-qt (Italiano)](amule.it.md) | Italian version: install and configure aMule or emule-qt, enable it in Gextto, use eD2k/Kad, troubleshooting and settings. |

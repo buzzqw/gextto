@@ -118,7 +118,7 @@ conflict with another, the more specific one wins.
   They are not a gap to close: they must not be enabled in managed mode. Anyone
   who wants feeds/rules/searches runs a standalone gx-torrent (or the test
   instance of `scripts/gx-core-test.sh`). Details: `docs/gx-core.md`.
-- Open items and the gate that unblocks each: **`docs/todo.md`**; the engine and its
+- Open items in priority order and the gate that unblocks each: **`docs/todo.md`**; the engine and its
   standalone use: **`docs/gx-core.md`**.
 
 ## Build and test
@@ -556,16 +556,19 @@ not. Error strings reachable from a log line are English too.
 
 ## `docs/todo.md`
 
-The maintained list of open work. One line per item: what to do and the gate that
-unblocks it. Every idea proposed by the operator or by the assistant during a session is
-recorded here in the same cycle, without waiting to be asked: in the matching area once
-accepted, under *Proposals* while it is still a decision. An idea that is rejected is not
-written here at all: the file holds only work that will be done. An idea must not stay
-only in the chat. It is not a changelog, a design document or a manual: no history, no
-positioning, no implementation chronicles, no dates, build numbers, commit hashes or
-measurements. When an item lands, delete it; when a new one is accepted, add it. The state
-of the product is in `gx-torrent.md`, `gx-core.md` and the manuals; the numbers are in
-`measurements.md`.
+The maintained list of open work. One line per item: the area, what to do and the gate
+that unblocks it. The file is ordered by value, in four sections — **Now** (clear value,
+low cost), **Measure** (clear value, but a number or a refactor first), **Plan** (medium
+value: a product decision or a UX improvement), **Later** (foundations and large
+features) — and a product choice still open is marked *decision*. Every idea proposed by
+the operator or by the assistant during a session is recorded here in the same cycle,
+without waiting to be asked, in the section that matches its value. An idea that is
+rejected is not written here at all: the file holds only work that will be done. An idea
+must not stay only in the chat. It is not a changelog, a design document or a manual: no
+history, no justification essay, no implementation chronicles, no dates, build numbers,
+commit hashes or measurements. When an item lands, delete it; when a new one is accepted,
+add it and place it in the right section. The state of the product is in `gx-torrent.md`,
+`gx-core.md` and the manuals; the numbers are in `measurements.md`.
 
 ## Interface accessibility and i18n
 - The pages of the gx-torrent daemon (`internal/webui/assets`) use the **shared
@@ -625,7 +628,7 @@ Index of the documents: `docs/README.md`.
 | Interface usage, visible behaviour | `docs/MANUAL.it.md`, `docs/MANUAL.en.md` |
 | Project presentation, quick build | `README.md`, `README.it.md` |
 | Architecture and file map | `docs/ARCHITECTURE.md` |
-| Open items and the gate that unblocks each | `docs/todo.md` |
+| Open items in priority order and the gate that unblocks each | `docs/todo.md` |
 | Benchmarks, CPU/RAM/latency and build/test/CI times (numbers only, with machine and date) | `docs/measurements.md` |
 | gx-torrent daemon and gx-core engine | `docs/gx-torrent.md`, `docs/gx-core.md`, `internal/gxcore/GEXTTO.md` |
 | Engine BEP compliance | `docs/bep.md` |
