@@ -3330,7 +3330,7 @@ func tevLogDownloadComplete(db *Database, event *models.TorrentEvent, release *m
 		logging.HumanBytesI64(size),
 		logDuration(time.Duration(durationSeconds)*time.Second),
 		logging.HumanRate(averageSpeed),
-	), "folder", path, "hash", event.Hash)
+	), "download folder", path, "hash", event.Hash)
 }
 
 // ---------------------------------------------------------------------------
@@ -3683,7 +3683,7 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		tevNotifySeeding(db, notifier, &event, &release, source, size)
 		logging.Info(fmt.Sprintf("🎉 %s downloaded. It stays in the download folder while it is shared, then moves to the library", logTarget(&release)),
-			"folder", source, "hash", event.Hash)
+			"download folder", source, "hash", event.Hash)
 		return false, nil
 	}
 	// aMule cannot relocate a download: a file that reaches this point (no
