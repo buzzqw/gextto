@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -75,6 +76,11 @@ type candidateRun struct {
 	movieArchive  *models.ArchiveQuality
 	forbidUpgrade bool
 
+	// watchedOnce loads the media server's played items at most once per pass.
+	watchedOnce sync.Once
+	watched     map[string]bool
+	watchedErr  error
+
 	// packAnnounced and packNameIsAuthoritative remember that a pack's season
 	// came from the torrent name instead of the announcement. The explanation
 	// belongs to the download line, not to every candidate that is then
@@ -95,6 +101,27 @@ func (r *candidateRun) reconcilePackIdentity() {
 		r.packAnnounced = announced
 	}
 	r.packNameIsAuthoritative = true
+}
+
+// alreadyWatched is the optional media-server filter. The set is loaded once
+// per pass; a failed server only disables the filter for this pass, so a
+// household does not lose downloads because Plex or Jellyfin was offline.
+func (r *candidateRun) alreadyWatched(release *models.Release) bool {
+	if !watchedSuppressionEnabled(r.p.cfg) {
+		return false
+	}
+	r.watchedOnce.Do(func() {
+		r.watched, r.watchedErr = loadWatchedKeys(r.ctx, r.p.cfg)
+	})
+	if r.watchedErr != nil || r.watched == nil {
+		return false
+	}
+	key := watchedReleaseKey(release)
+	if key == "" || !r.watched[key] {
+		return false
+	}
+	logging.Info(fmt.Sprintf("⏭️ %s is already marked as watched on the media server; Gextto did not start it", logTarget(release)))
+	return true
 }
 
 // try evaluates one candidate release and, when it wins, starts its download:
@@ -312,6 +339,10 @@ func (r *candidateRun) judge() (stop bool, err error) {
 	}
 	// A release whose seeder count nobody reported gets the DHT's answer
 	// before the gate reads it (swarm_probe.go).
+	if r.alreadyWatched(release) {
+		r.p.recordSkip(release, r.releaseScore, "already_watched", "already watched on the media server", r.gapEpisodes)
+		return false, nil
+	}
 	probeSwarmCounts(p.torrents, release)
 	// Decide only: the library is not written until the torrent is in the
 	// engine (see startApprovedRelease).

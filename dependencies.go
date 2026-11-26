@@ -32,6 +32,7 @@ func declaredDependencies(cfg *Config) dependencyReport {
 		{Name: "TheTVDB", Purpose: "alternate episode and series identifiers", Configured: cfg.TvdbAPIKey() != nil && strings.TrimSpace(*cfg.TvdbAPIKey()) != "", Optional: true},
 		{Name: "TVmaze", Purpose: "series status and schedule checks", Configured: true, Optional: true},
 		{Name: "Simkl", Purpose: "watchlist import and watched state", Configured: has("simkl_client_id"), Optional: true},
+		{Name: "MDbList", Purpose: "watchlist and custom list import", Configured: has(mdblistAPIKeyKey), Optional: true},
 		{Name: "FlareSolverr", Purpose: "indexer challenges", Configured: cfg.FlaresolverrURL != nil && strings.TrimSpace(*cfg.FlaresolverrURL) != "", Optional: true},
 		{Name: "Subtitles provider", Purpose: "subtitle search and download", Configured: has(subtitleSettingAPIKey), Optional: true},
 	}

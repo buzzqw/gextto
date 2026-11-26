@@ -4842,7 +4842,6 @@ deu:
   "Pianificazione settimanale": "Wöchentliche Planung"
   "Post": "Post"
   "Programma": "Programm"
-  "Provider": "Provider"
   "Prowlarr": "Prowlarr"
   "Pulizia database": "Datenbankbereinigung"
   "Pulizia dati tecnici e storico, senza toccare la libreria.": "Bereinigung technischer Daten und des Verlaufs, ohne die Bibliothek zu berühren."
@@ -6846,3 +6845,23 @@ deu:
   "Configurazione importata: %d sezioni applicate.": "Konfiguration importiert: %d Abschnitte angewendet."
   "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Vorschau: %d Abschnitte bereit, nichts geschrieben."
   "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Profile, Regeln, Filter, Listen und Titel in einem lesbaren Dokument herunterladen. Geheimnisse sind nicht enthalten: nach dem Import erneut einrichten. Der Import zeigt zuerst eine Vorschau und wendet nur die im Datei vorhandenen Abschnitte an."
+
+  # mdblist
+  "MDbList": "MDbList"
+  "Anteprima importa lista": "Listenimport-Vorschau"
+  "Apre l'anteprima selettiva della lista MDbList.": "Öffnet die selektive Vorschau der MDbList-Liste."
+  "MDbList usa una sola chiave API: scegli quale lista importare.": "MDbList verwendet einen einzigen API-Schlüssel: wähle die zu importierende Liste."
+  "Salva MDbList": "MDbList speichern"
+  "Verifica la chiave leggendo le liste disponibili.": "Prüft den Schlüssel durch Lesen der verfügbaren Listen."
+  "Chiave API di MDbList. Per sicurezza non viene mostrata: lascia vuoto per mantenere quella salvata.": "MDbList-API-Schlüssel. Aus Sicherheitsgründen nicht sichtbar: leer lassen, um den gespeicherten zu behalten."
+  "ID lista": "Listen-ID"
+  "Identificativo della lista da importare; senza di esso l'anteprima non sa cosa leggere.": "Kennung der zu importierenden Liste; ohne sie hat die Vorschau nichts zu lesen."
+  "L'anteprima legge la lista del provider scelto e mostra cosa manca in libreria. Non aggiunge nulla finché non scegli i titoli e confermi.": "Die Vorschau liest die Liste des gewählten Anbieters und zeigt, was in der Bibliothek fehlt. Nichts wird hinzugefügt, bis du die Titel auswählst und bestätigst."
+
+  # watched state
+  "Stato visto": "Gesehen-Status"
+  "Se attivo, Gextto non cerca una copia già segnata come vista su Plex o Jellyfin. Il controllo è best-effort: se il server non risponde, la ricerca continua.": "Wenn aktiv, sucht Gextto keine Kopie, die auf Plex oder Jellyfin bereits als gesehen markiert ist. Die Prüfung ist best-effort: antwortet der Server nicht, geht die Suche weiter."
+  "Salva preferenza": "Einstellung speichern"
+  "Salta ciò che è già visto": "Bereits Gesehenes überspringen"
+  "Usa lo stato di visione dei media server prima di avviare una ricerca. Disattivo di default.": "Verwendet den Gesehen-Status der Medienserver, bevor eine Suche startet. Standardmäßig aus."
+  "Provider": "Anbieter"

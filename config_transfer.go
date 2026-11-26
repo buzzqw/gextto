@@ -35,7 +35,7 @@ var configTransferSecretKeys = map[string]bool{
 	"notify_discord_url": true, "notify_slack_url": true, "notify_gotify_token": true,
 	"notify_ntfy_token": true, "notify_pushover_token": true, "notify_apprise_key": true,
 	"email_password": true, "jellyfin_api_key": true, "plex_token": true,
-	"simkl_client_id": true, "simkl_access_token": true, "gxtorrent_proxy": true,
+	"simkl_client_id": true, "simkl_access_token": true, mdblistAPIKeyKey: true, "gxtorrent_proxy": true,
 	"flaresolverr_url": true, subtitleSettingAPIKey: true, subtitleSettingPassword: true,
 }
 

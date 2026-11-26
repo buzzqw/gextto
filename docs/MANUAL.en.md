@@ -3189,6 +3189,27 @@ profile and a series root folder, enable season folders, or run a dry-run
 simulation. Duplicates are never replaced; only missing external ids are filled.
 Movies keep using the global archive folder.
 
+### MDbList
+
+| Field / action | What it does |
+|---|---|
+| API key | MDbList API key (not shown again after saving). |
+| List id | Which list to import: without a selected id the preview has nothing to read. |
+| Verify | Reads the available lists with the saved key. |
+| Import list preview | Opens the same selective preview as Simkl, using the MDbList list. |
+
+In the *Import a list* page choose the provider from the **Provider** menu: the
+preview and the apply step are the same, including duplicate checks, external
+ids and dry-run simulation.
+
+### Watched state
+
+With **Skip what is already watched**, Gextto asks Plex and Jellyfin before
+looking for a copy: a movie marked as played or an episode with a view count
+above zero is not searched again. The filter is optional and off by default,
+best-effort — if a server does not answer the search continues — and it never
+changes the library.
+
 ### Jellyfin
 
 | Field / action | What it does |

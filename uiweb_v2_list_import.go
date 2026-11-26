@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
 
 type v2ListImportView struct {
+	Source            string
 	Items             []ListImportItem
 	Profiles          []v2ProfileChoice
 	SeriesRoot        string
@@ -32,14 +34,18 @@ func v2ListImportPageFrom(s *AppState) v2ListImportView {
 		root = strings.TrimSpace(*cfg.ArchiveRoot)
 	}
 	return v2ListImportView{
+		Source:     "simkl",
 		Profiles:   v2ProfileChoices(s, qualityProfilesFromConfig(cfg)),
 		SeriesRoot: root, GlobalArchiveRoot: root, DryRun: s.dryRun(),
 	}
 }
 
-func v2ListImportPreview(s *AppState) v2ListImportView {
+func v2ListImportPreview(s *AppState, source string) v2ListImportView {
 	view := v2ListImportPageFrom(s)
-	raw, status := v2InternalJSON(s, http.MethodGet, "/api/list-import/preview?source=simkl", nil, nil)
+	if selected, ok := listImportProviderSource(source); ok {
+		view.Source = selected
+	}
+	raw, status := v2InternalJSON(s, http.MethodGet, "/api/list-import/preview?source="+url.QueryEscape(view.Source), nil, nil)
 	if status >= 400 {
 		view.Error, view.Message = true, v2JSONError(raw)
 		return view
@@ -78,7 +84,11 @@ func v2ListImportApply(s *AppState, r *http.Request) v2ListImportView {
 		SeasonSubfolders: r.FormValue("season_subfolders") == "true",
 		DryRun:           r.FormValue("dry_run") == "true",
 	}
-	body, _ := json.Marshal(listImportApplyRequest{Source: "simkl", Items: selected, Options: options})
+	source, _ := listImportProviderSource(r.FormValue("source"))
+	if source == "" {
+		source = "simkl"
+	}
+	body, _ := json.Marshal(listImportApplyRequest{Source: source, Items: selected, Options: options})
 	raw, status := v2InternalJSON(s, http.MethodPost, "/api/list-import/apply", nil, body)
 	if status >= 400 {
 		view.Error, view.Message = true, v2JSONError(raw)
@@ -96,7 +106,7 @@ func v2ListImportApply(s *AppState, r *http.Request) v2ListImportView {
 }
 
 func V2ListImportPreview(w http.ResponseWriter, r *http.Request, s *AppState) {
-	v2Render(w, http.StatusOK, "v2_list_import_panel", v2ListImportPreview(s), s)
+	v2Render(w, http.StatusOK, "v2_list_import_panel", v2ListImportPreview(s, r.FormValue("source")), s)
 }
 
 func V2ListImportApply(w http.ResponseWriter, r *http.Request, s *AppState) {

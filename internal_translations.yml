@@ -612,8 +612,6 @@ eng:
   "Telegram non configurato": "Telegram not configured"
   "salvato": "saved"
   "mancante": "missing"
-  "configurato": "configured"
-  "non configurato": "not configured"
   "Nascondi": "Hide"
   "autenticato": "authenticated"
   "Trakt: autenticato": "Trakt: authenticated"
@@ -4179,7 +4177,6 @@ eng:
   "Pianificazione settimanale": "Weekly scheduling"
   "Post": "Post"
   "Programma": "Program"
-  "Provider": "Provider"
   "Prowlarr": "Prowlarr"
   "Pulizia database": "Database cleanup"
   "Pulizia dati tecnici e storico, senza toccare la libreria.": "Cleanup of technical data and history, without touching the library."
@@ -6182,3 +6179,27 @@ eng:
   "Configurazione importata: %d sezioni applicate.": "Configuration imported: %d sections applied."
   "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Preview: %d sections ready, nothing written."
   "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Download profiles, rules, filters, lists and titles in a readable document. Secrets are not included: configure them again after an import. The import shows a preview first and applies only the sections present in the file."
+
+  # mdblist
+  "MDbList": "MDbList"
+  "Anteprima importa lista": "List import preview"
+  "Apre l'anteprima selettiva della lista MDbList.": "Opens the selective preview of the MDbList list."
+  "MDbList usa una sola chiave API: scegli quale lista importare.": "MDbList uses a single API key: choose which list to import."
+  "Salva MDbList": "Save MDbList"
+  "Verifica la chiave leggendo le liste disponibili.": "Check the key by reading the available lists."
+  "Chiave API di MDbList. Per sicurezza non viene mostrata: lascia vuoto per mantenere quella salvata.": "MDbList API key. It is not shown for safety: leave it empty to keep the saved one."
+  "ID lista": "List id"
+  "Identificativo della lista da importare; senza di esso l'anteprima non sa cosa leggere.": "Identifier of the list to import; without it the preview has nothing to read."
+  "L'anteprima legge la lista del provider scelto e mostra cosa manca in libreria. Non aggiunge nulla finché non scegli i titoli e confermi.": "The preview reads the chosen provider's list and shows what is missing from the library. Nothing is added until you pick the titles and confirm."
+
+  # watched state
+  "Stato visto": "Watched state"
+  "Se attivo, Gextto non cerca una copia già segnata come vista su Plex o Jellyfin. Il controllo è best-effort: se il server non risponde, la ricerca continua.": "When on, Gextto does not look for a copy already marked as watched on Plex or Jellyfin. The check is best-effort: if the server does not answer, the search continues."
+  "Salva preferenza": "Save preference"
+  "Salta ciò che è già visto": "Skip what is already watched"
+  "Usa lo stato di visione dei media server prima di avviare una ricerca. Disattivo di default.": "Uses the media servers' watched state before starting a search. Off by default."
+
+  # mdblist status
+  "configurato": "configured"
+  "non configurato": "not configured"
+  "Provider": "Provider"

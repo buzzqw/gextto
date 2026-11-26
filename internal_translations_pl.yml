@@ -4782,7 +4782,6 @@ pol:
   "Pianificazione settimanale": "Planowanie tygodniowe"
   "Post": "Post"
   "Programma": "Program"
-  "Provider": "Provider"
   "Prowlarr": "Prowlarr"
   "Pulizia database": "Czyszczenie bazy danych"
   "Pulizia dati tecnici e storico, senza toccare la libreria.": "Czyszczenie danych technicznych i historii, bez naruszania biblioteki."
@@ -6787,3 +6786,23 @@ pol:
   "Configurazione importata: %d sezioni applicate.": "Zaimportowano konfigurację: zastosowano %d sekcji."
   "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Podgląd: %d sekcji gotowych, nic nie zapisano."
   "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Pobierz profile, reguły, filtry, listy i tytuły w czytelnym dokumencie. Sekrety nie są uwzględniane: skonfiguruj je ponownie po imporcie. Import najpierw pokazuje podgląd i stosuje tylko sekcje obecne w pliku."
+
+  # mdblist
+  "MDbList": "MDbList"
+  "Anteprima importa lista": "Podgląd importu listy"
+  "Apre l'anteprima selettiva della lista MDbList.": "Otwiera podgląd selektywnego importu listy MDbList."
+  "MDbList usa una sola chiave API: scegli quale lista importare.": "MDbList używa jednego klucza API: wybierz listę do importu."
+  "Salva MDbList": "Zapisz MDbList"
+  "Verifica la chiave leggendo le liste disponibili.": "Sprawdza klucz przez odczyt dostępnych list."
+  "Chiave API di MDbList. Per sicurezza non viene mostrata: lascia vuoto per mantenere quella salvata.": "Klucz API MDbList. Nie jest wyświetlany ze względów bezpieczeństwa: pozostaw puste, aby zachować zapisany."
+  "ID lista": "ID listy"
+  "Identificativo della lista da importare; senza di esso l'anteprima non sa cosa leggere.": "Identyfikator listy do importu; bez niego podgląd nie ma czego czytać."
+  "L'anteprima legge la lista del provider scelto e mostra cosa manca in libreria. Non aggiunge nulla finché non scegli i titoli e confermi.": "Podgląd czyta listę wybranego dostawcy i pokazuje, czego brakuje w bibliotece. Nic nie zostaje dodane, dopóki nie wybierzesz tytułów i nie potwierdzisz."
+
+  # watched state
+  "Stato visto": "Stan obejrzeń"
+  "Se attivo, Gextto non cerca una copia già segnata come vista su Plex o Jellyfin. Il controllo è best-effort: se il server non risponde, la ricerca continua.": "Gdy włączone, Gextto nie szuka kopii już oznaczonej jako obejrzana w Plex lub Jellyfin. Sprawdzenie jest najlepszej próby: jeśli serwer nie odpowie, wyszukiwanie trwa."
+  "Salva preferenza": "Zapisz preferencję"
+  "Salta ciò che è già visto": "Pomiń już obejrzane"
+  "Usa lo stato di visione dei media server prima di avviare una ricerca. Disattivo di default.": "Używa stanu obejrzeń serwerów multimediów przed rozpoczęciem wyszukiwania. Domyślnie wyłączone."
+  "Provider": "Dostawca"

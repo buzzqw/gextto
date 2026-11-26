@@ -686,7 +686,7 @@ var settingWritableAPIOnly = map[string]bool{
 
 var settingWritablePrefixes = []string{
 	"torrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
-	"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",
+	"simkl_", "mdblist_", "backup_", "notify_", "jellyfin_", "plex_", "watched_", "gxtorrent_",
 }
 
 // SaveSetting handles POST /api/config/settings.

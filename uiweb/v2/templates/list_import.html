@@ -4,8 +4,9 @@
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Importa una lista"}}</h3></div>
     <div class="panel-body">
-      <p>{{tr "L'anteprima legge la watchlist Simkl e mostra cosa manca in libreria. Non aggiunge nulla finché non scegli i titoli e confermi."}}</p>
+      <p>{{tr "L'anteprima legge la lista del provider scelto e mostra cosa manca in libreria. Non aggiunge nulla finché non scegli i titoli e confermi."}}</p>
       <form hx-post="/list-import/preview" hx-target="#v2-list-import-panel" hx-swap="innerHTML" hx-disabled-elt="find button">
+        <label class="field"><span>{{tr "Provider"}}</span><select class="input" name="source"><option value="simkl"{{if eq .Source "simkl"}} selected{{end}}>Simkl</option><option value="mdblist"{{if eq .Source "mdblist"}} selected{{end}}>{{tr "MDbList"}}</option></select></label>
         <button class="btn primary" type="submit">{{tr "Carica anteprima"}}</button>
       </form>
     </div>
@@ -18,9 +19,10 @@
 {{if .Error}}<div class="notice err" role="alert">{{tr .Message}}</div>{{end}}
 {{if .Report}}
 <div class="notice ok" role="status">{{tr .Message}}</div>
-<div class="toolbar"><form hx-post="/list-import/preview" hx-target="#v2-list-import-panel" hx-swap="innerHTML"><button class="btn sm" type="submit">{{tr "Nuova anteprima"}}</button></form></div>
+<div class="toolbar"><form hx-post="/list-import/preview" hx-target="#v2-list-import-panel" hx-swap="innerHTML"><input type="hidden" name="source" value="{{.Source}}" /><button class="btn sm" type="submit">{{tr "Nuova anteprima"}}</button></form></div>
 {{else if .Scanned}}
 <form hx-post="/list-import/apply" hx-target="#v2-list-import-panel" hx-swap="innerHTML">
+  <input type="hidden" name="source" value="{{.Source}}" />
   <input type="hidden" name="items" value="{{.ItemsJSON}}" />
   <div class="panel">
     <div class="panel-head"><h3>{{tr "Titoli trovati"}}</h3><small class="muted">{{tr "Solo i nuovi sono selezionati; i duplicati restano invariati"}}</small></div>

@@ -839,6 +839,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"tvdb_language":                        cfg.TvdbLanguage(),
 		"simkl_configured":                     settingsOr(cfg, "simkl_client_id", "") != "",
 		"simkl_authenticated":                  settingsOr(cfg, "simkl_access_token", "") != "",
+		"mdblist_configured":                   settingsOr(cfg, mdblistAPIKeyKey, "") != "",
 		"backup_send_telegram":                 settingsBool(cfg, "backup_send_telegram", false),
 		"notify_telegram":                      cfg.NotifyTelegram,
 		"notify_email":                         cfg.NotifyEmail,

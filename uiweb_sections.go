@@ -496,6 +496,10 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
 	simklStatus, simklStatusClass := integrationStatus(cfg, "simkl")
+	mdblistStatus, mdblistStatusClass := "non configurato", ""
+	if settingsNonEmpty(cfg, mdblistAPIKeyKey) {
+		mdblistStatus, mdblistStatusClass = "configurato", "ok"
+	}
 	group := func(name string, section uiPageSection) uiPageSection {
 		section.Group = name
 		return section
@@ -553,6 +557,20 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				}),
 			},
 		})),
+		group("Servizi", sectionIntegration(uiIntegrationCardSection{
+			Title: "MDbList", Status: mdblistStatus, StatusClass: mdblistStatusClass,
+			Children: []uiPageSection{
+				sectionLinks(uiLinksSection{Title: "Importa lista", Hint: "Controlla i duplicati e scegli i titoli prima di modificare la libreria.", Links: []uiLinkItem{{Label: "Anteprima importa lista", Href: "/?view=list-import", Hint: "Apre l'anteprima selettiva della lista MDbList."}}}),
+				sectionForm(uiFormSection{
+					Title: "Impostazioni", Hint: "MDbList usa una sola chiave API: scegli quale lista importare.", Path: "/api/mdblist/settings", Submit: "Salva MDbList",
+					TestPath: "/api/mdblist/test", TestLabel: "Verifica", TestHint: "Verifica la chiave leggendo le liste disponibili.",
+					Fields: []uiFormField{
+						{Name: mdblistAPIKeyKey, Label: "API key", Value: settingsOr(cfg, mdblistAPIKeyKey, ""), Hint: "Chiave API di MDbList. Per sicurezza non viene mostrata: lascia vuoto per mantenere quella salvata."},
+						{Name: mdblistListIDKey, Label: "ID lista", Value: settingsOr(cfg, mdblistListIDKey, ""), Hint: "Identificativo della lista da importare; senza di esso l'anteprima non sa cosa leggere."},
+					},
+				}),
+			},
+		})),
 		group("Media server", sectionSettingsActions("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key", "jellyfin_path_mappings"), []uiActionButton{
 			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}", Hint: "Verifica che Jellyfin risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}", Hint: "Chiede a Jellyfin di aggiornare la libreria."},
@@ -560,6 +578,13 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		group("Media server", sectionSettingsActions("Plex", "URL del server e token X-Plex-Token.", uiSettingFields(cfg, "plex_url", "plex_token", "plex_path_mappings"), []uiActionButton{
 			{Label: "Test connessione", Method: "POST", Path: "/api/plex/test", Body: "{}", Hint: "Verifica che Plex risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/plex/refresh", Body: "{}", Hint: "Chiede a Plex di aggiornare la libreria."},
+		})),
+		group("Media server", sectionForm(uiFormSection{
+			Title: "Stato visto", Hint: "Se attivo, Gextto non cerca una copia già segnata come vista su Plex o Jellyfin. Il controllo è best-effort: se il server non risponde, la ricerca continua.",
+			Path: "/api/watched/settings", Submit: "Salva preferenza",
+			Fields: []uiFormField{
+				boolFieldHint(watchedSuppressionKey, "Salta ciò che è già visto", "Usa lo stato di visione dei media server prima di avviare una ricerca. Disattivo di default.", settingsBool(cfg, watchedSuppressionKey, false)),
+			},
 		})),
 		group("Sorgenti", sectionEditor(uiIndexerEditor)),
 		group("Sorgenti", sectionSettingsActions("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"), []uiActionButton{

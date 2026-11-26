@@ -3229,6 +3229,21 @@ stagione oppure eseguire una simulazione dry-run. I duplicati non vengono
 sostituiti; vengono riempiti solo gli ID esterni mancanti. I film continuano a
 usare la cartella archivio globale.
 
+### MDbList
+
+| Campo / azione | Cosa fa |
+|---|---|
+| API key | Chiave API di MDbList (non viene mostrata dopo il salvataggio). |
+| ID lista | Quale lista importare: senza un ID scelto l'anteprima non sa cosa leggere. |
+| Verifica | Legge le liste disponibili con la chiave salvata. |
+| Anteprima importa lista | Apre la stessa anteprima selettiva di Simkl, ma con la lista MDbList. |
+
+Nella pagina *Importa una lista* puoi scegliere il provider dal menu **Provider**: l'anteprima e l'applicazione sono le stesse, compresi controllo dei duplicati, ID esterni e simulazione dry-run.
+
+### Stato visto
+
+Con **Salta ciò che è già visto** Gextto interroga Plex e Jellyfin prima di cercare una copia: un film segnato come visto o una puntata con `viewCount` maggiore di zero non viene cercato di nuovo. Il filtro è facoltativo e disattivo di default, è best-effort — se un server non risponde la ricerca continua — e non modifica la libreria.
+
 ### Jellyfin
 
 | Campo / azione | Cosa fa |

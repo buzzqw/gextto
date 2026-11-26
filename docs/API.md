@@ -111,7 +111,7 @@ change. `/ui` is not served. For operational checks use
 | GET | `/api/v3/queue` | v3 queue (the torrent session) |
 | GET | `/api/import/preview` | manual import: the video files of a path with their match and destination (?path=) |
 | POST | `/api/import` | manual import: rename, move and register one file |
-| GET | `/api/list-import/preview` | read-only Simkl list preview with duplicate status, external ids, quality profiles and archive choices (?source=simkl) |
+| GET | `/api/list-import/preview` | read-only list preview with duplicate status, external ids, quality profiles and archive choices (?source=simkl or ?source=mdblist) |
 | POST | `/api/list-import/apply` | transactionally import selected list items; body carries source, items and options (quality_profile_id, series_root, season_subfolders, dry_run) |
 | POST | `/list-import/preview` | SSR/HTMX fragment for the Simkl list preview |
 | POST | `/list-import/apply` | SSR/HTMX fragment that applies the selected preview rows |
@@ -333,6 +333,12 @@ state.
 | GET | `/api/simkl/status` | SimKL status |
 | GET | `/api/simkl/watchlist` | SimKL watchlist |
 | POST | `/api/simkl/watchlist/import` | import the SimKL watchlist |
+| GET | `/api/mdblist/status` | whether an MDbList API key and a list id are saved |
+| GET | `/api/mdblist/settings` | MDbList settings; the API key is never echoed back |
+| POST | `/api/mdblist/settings` | save the MDbList API key and list id |
+| POST | `/api/mdblist/test` | check the saved key by reading the available lists |
+| GET | `/api/watched/settings` | whether already-watched suppression is enabled |
+| POST | `/api/watched/settings` | enable or disable already-watched suppression |
 | GET | `/api/sources/health` | health of the sources |
 | GET | `/api/stats` | library statistics |
 | GET | `/api/status` | daemon status, version and build |

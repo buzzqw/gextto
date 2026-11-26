@@ -187,7 +187,10 @@ func listImportIDsKey(ids map[string]string) string {
 }
 
 func validListImportItem(item ListImportItem) bool {
-	if item.Source != "simkl" || (item.Kind != "series" && item.Kind != "movie") || strings.TrimSpace(item.Title) == "" || len([]rune(item.Title)) > 300 {
+	if _, ok := listImportProviderSource(item.Source); !ok {
+		return false
+	}
+	if (item.Kind != "series" && item.Kind != "movie") || strings.TrimSpace(item.Title) == "" || len([]rune(item.Title)) > 300 {
 		return false
 	}
 	if item.Year != "" {
