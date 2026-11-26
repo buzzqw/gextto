@@ -6827,3 +6827,15 @@ fra:
   "Quarantena i file sospetti": "Mettre en quarantaine les fichiers suspects"
   "Solo avviso": "Signaler seulement"
   "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "Ce qui se passe quand un téléchargement contient un programme ou un fichier qui ne devrait pas être là. Bloquer supprime le torrent et les fichiers partiels ; Quarantaine déplace seulement les fichiers suspects et garde la bonne vidéo ; Signaler seulement ne change rien. Sans vidéo valide, la quarantaine est impossible et le torrent est bloqué comme avant."
+
+  # portable configuration
+  "Configurazione portabile": "Configuration portable"
+  "Scarica configurazione": "Télécharger la configuration"
+  "Documento di configurazione": "Document de configuration"
+  "Incolla qui il contenuto del file esportato": "Collez ici le contenu du fichier exporté"
+  "Anteprima import": "Aperçu de l'import"
+  "Applica import": "Appliquer l'import"
+  "Applicare la configurazione importata?": "Appliquer la configuration importée ?"
+  "Configurazione importata: %d sezioni applicate.": "Configuration importée : %d sections appliquées."
+  "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Aperçu : %d sections prêtes, rien n'a été écrit."
+  "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Téléchargez les profils, règles, filtres, listes et titres dans un document lisible. Les secrets ne sont pas inclus : à configurer à nouveau après l'import. L'import affiche d'abord un aperçu et n'applique que les sections présentes dans le fichier."

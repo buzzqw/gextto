@@ -136,6 +136,9 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/library/cross-seed/seed` | seed one allowed copy without downloading it again (JSON body {"hash":"…","source":"…","title":"…","confirmed":false}) |
 | GET | `/import/preview` | manual import page: preview fragment |
 | POST | `/import/apply` | manual import page: confirm one file |
+| GET | `/api/config/export` | download a versioned, readable copy of profiles, rules, filters, lists, indexers and series/movie titles; secrets are excluded unless ?include_secrets=1 is passed |
+| POST | `/api/config/import/preview` | validate a configuration document without writing anything |
+| POST | `/api/config/import` | apply a configuration document after a preview, with ?confirm=1 |
 | GET | `/api/config` | read the configuration |
 | POST | `/api/config` | save the configuration |
 | POST | `/api/config/add-all-from-archive` | add the series found in the archive folder to the configuration |
@@ -146,6 +149,17 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/config/movies` | save the movie defaults |
 | POST | `/api/config/series` | save the series defaults |
 | POST | `/api/config/settings` | save one setting |
+
+A configuration export is a JSON document with `format: "gextto-config"`,
+`schema_version: 1`, the application version, a `secrets` field and a `sections`
+map. The settings, structured lists, indexers and the series/movie lists each
+have their own section. By default secret values are replaced by their key names
+in `excluded_keys`, and indexer API keys are emptied: configure them again after
+an import, or pass `include_secrets=1` to the export when you trust the copy.
+Import is a two-step operation: the preview validates the document and reports
+sections, warnings and rejected values, then the import with `confirm=1` applies
+only the sections present. Machine-specific paths such as `data_dir`, `listen`
+and the engine addresses are never exported or changed.
 | DELETE | `/api/config/settings/{key}` | reset one setting |
 | GET | `/api/config/source-filters` | per-source filters |
 | POST | `/api/config/source-filters` | save the per-source filters |

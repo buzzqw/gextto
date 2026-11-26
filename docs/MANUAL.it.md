@@ -3413,6 +3413,10 @@ credenziali dell'interfaccia e riceve un cookie di sessione valido solo per
 |---|---|
 | Log gx-torrent | Ultime righe del log del motore torrent (`gx-torrent/gx-torrent.log`), con filtro testo, solo avvisi/errori, numero di righe e scelta tra file attivo e rotazioni. |
 
+### Configurazione portabile
+
+**Scarica configurazione** produce un documento JSON leggibile e versionato con profili di qualità, regole di seed, filtri, cartelle osservate, hook, indexer, liste di serie e film e impostazioni. I segreti (chiavi API, password, token) non sono inclusi: nel documento compaiono solo i nomi delle chiavi escluse, così sai cosa riconfigurare. Puoi incollare il documento nella casella **Documento di configurazione** e scegliere **Anteprima import** per vedere quante sezioni verrebbero applicate e quali avvisi ci sono, senza scrivere nulla; **Applica import** esegue solo dopo l'anteprima. L'import tocca solo le sezioni presenti nel file: le altre impostazioni restano come sono, e le chiavi API degli indexer già salvate vengono mantenute quando il documento non le contiene. Percorsi come cartella dati e porte non vengono esportati né modificati.
+
 ### Backup
 
 | Voce | Cosa fa |

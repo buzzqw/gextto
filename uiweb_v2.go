@@ -356,6 +356,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /maintenance/folder-rename/apply", V2FolderRenameApply)
 	v2Handle(s, mux, "POST /maintenance/archive-sql/preview", V2ArchiveSQLPreview)
 	v2Handle(s, mux, "POST /maintenance/archive-sql/delete", V2ArchiveSQLDelete)
+	v2Handle(s, mux, "POST /maintenance/config-import", V2ConfigImport)
 	v2Handle(s, mux, "GET /partial/rename-progress", V2RenameProgress)
 
 	// OAuth / PIN (Simkl).

@@ -90,6 +90,23 @@
     {{if .Buttons}}<div class="mt-12 toolbar">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
   </div>
 </div>
+{{else if eq .Kind "config_transfer"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{tr .Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{tr .Hint}}</p>{{end}}
+    <div class="toolbar"><a class="btn sm" href="/api/config/export" download>{{tr "Scarica configurazione"}}</a></div>
+    <form class="form-grid mt-12" method="post" action="/maintenance/config-import" hx-post="/maintenance/config-import" hx-target="#v2-config-import-result" hx-swap="innerHTML">
+      <label for="v2-config-document">{{tr "Documento di configurazione"}}</label>
+      <textarea id="v2-config-document" name="document" rows="8" spellcheck="false" placeholder="{{tr "Incolla qui il contenuto del file esportato"}}"></textarea>
+      <div class="form-actions">
+        <button class="btn primary" type="submit" name="step" value="preview">{{tr "Anteprima import"}}</button>
+        <button class="btn" type="submit" name="step" value="apply_import" hx-confirm="{{tr "Applicare la configurazione importata?"}}">{{tr "Applica import"}}</button>
+      </div>
+    </form>
+    <div id="v2-config-import-result" class="form-output" aria-live="polite"></div>
+  </div>
+</div>
 {{else if eq .Kind "links"}}
 <div class="panel">
   <div class="panel-head"><h3>{{tr .Title}}</h3></div>
@@ -656,5 +673,11 @@
     </table></div>
     {{else}}<p class="muted">{{tr "Nessuna operazione in background."}}</p>{{end}}
   </div>
+</div>
+{{end}}
+
+{{define "v2_config_transfer_result"}}
+<div class="notice {{if .Error}}err{{else}}ok{{end}}" role="status">
+  {{if .Error}}{{tr .Error}}{{else}}{{tr .Message}}{{if .Warnings}}<ul>{{range .Warnings}}<li>{{tr .}}</li>{{end}}</ul>{{end}}{{end}}
 </div>
 {{end}}

@@ -6775,3 +6775,15 @@ pol:
   "Quarantena i file sospetti": "Odizoluj podejrzane pliki"
   "Solo avviso": "Tylko ostrzeżenie"
   "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "Co się dzieje, gdy pobierany zasób zawiera program lub plik, którego tam nie powinno być. Zablokuj usuwa torrent i częściowe pliki; Odizoluj przenosi tylko podejrzane pliki i zachowuje dobry film; Tylko ostrzeżenie nic nie zmienia. Bez ważnego filmu izolacja nie jest możliwa i torrent jest blokowany jak wcześniej."
+
+  # portable configuration
+  "Configurazione portabile": "Przenośna konfiguracja"
+  "Scarica configurazione": "Pobierz konfigurację"
+  "Documento di configurazione": "Dokument konfiguracji"
+  "Incolla qui il contenuto del file esportato": "Wklej tutaj zawartość wyeksportowanego pliku"
+  "Anteprima import": "Podgląd importu"
+  "Applica import": "Zastosuj import"
+  "Applicare la configurazione importata?": "Zastosować zaimportowaną konfigurację?"
+  "Configurazione importata: %d sezioni applicate.": "Zaimportowano konfigurację: zastosowano %d sekcji."
+  "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Podgląd: %d sekcji gotowych, nic nie zapisano."
+  "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Pobierz profile, reguły, filtry, listy i tytuły w czytelnym dokumencie. Sekrety nie są uwzględniane: skonfiguruj je ponownie po imporcie. Import najpierw pokazuje podgląd i stosuje tylko sekcje obecne w pliku."

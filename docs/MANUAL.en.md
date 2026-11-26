@@ -3373,6 +3373,10 @@ of the interface stays protected.
 |---|---|
 | gx-torrent log | Latest lines of the torrent engine log (`gx-torrent/gx-torrent.log`), with text filter, warnings/errors only, line count and a choice between the active file and the rotations. |
 
+### Portable configuration
+
+**Download configuration** produces a readable, versioned JSON document with quality profiles, seed rules, filters, watched folders, hooks, indexers, series and movie lists and settings. Secrets (API keys, passwords, tokens) are not included: the document lists only the names of the excluded keys, so you know what to configure again. Paste the document into **Configuration document** and choose **Import preview** to see how many sections would be applied and any warnings, without writing anything; **Apply import** runs only after a preview. The import touches only the sections present in the file: other settings stay as they are, and indexer API keys already saved are kept when the document does not contain them. Paths such as the data folder and the listening ports are neither exported nor changed.
+
 ### Backup
 
 | Item | What it does |

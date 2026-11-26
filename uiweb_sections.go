@@ -15,7 +15,9 @@ import (
 
 // uiPageSection is one block of a panel page.
 type uiPageSection struct {
-	Kind     string // table | actions | form | progress | comics_links | links | oauth | settings | list_editor | duplicates | ramdisk | folder_rename
+	Kind     string // table | actions | form | progress | comics_links | links | oauth | settings | list_editor | duplicates | ramdisk | folder_rename | config_transfer
+	Title    string // used by sections with their own panel template
+	Hint     string
 	Group    string // optional grouping label: consecutive same-group blocks render side by side
 	Table    uiTableSpec
 	Action   uiActionSection
@@ -468,6 +470,11 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Hint: "Invia una copia su Telegram usando il bot configurato nelle notifiche. Oltre 45 MB viene divisa in parti (.001, .002…): ricomponila con cat nome.zip.0* > nome.zip. Lascia No per non inviarla.", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
 			},
 		})),
+		group("Configurazione portabile", uiPageSection{
+			Title: "Configurazione portabile",
+			Hint:  "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.",
+			Kind:  "config_transfer",
+		}),
 		group("Backup", sectionTable(uiTableSpec{
 			Title:    "Backup disponibili",
 			Class:    "backup-table",

@@ -6170,3 +6170,15 @@ eng:
   "Quarantena i file sospetti": "Quarantine suspicious files"
   "Solo avviso": "Report only"
   "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "What happens when a download contains a program or a file that should not be there. Block removes the torrent and its partial files; Quarantine moves only the suspicious files and keeps the good video; Report only changes nothing. With no valid video, quarantine is not possible and the torrent is blocked as before."
+
+  # portable configuration
+  "Configurazione portabile": "Portable configuration"
+  "Scarica configurazione": "Download configuration"
+  "Documento di configurazione": "Configuration document"
+  "Incolla qui il contenuto del file esportato": "Paste the exported file contents here"
+  "Anteprima import": "Import preview"
+  "Applica import": "Apply import"
+  "Applicare la configurazione importata?": "Apply the imported configuration?"
+  "Configurazione importata: %d sezioni applicate.": "Configuration imported: %d sections applied."
+  "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Preview: %d sections ready, nothing written."
+  "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Download profiles, rules, filters, lists and titles in a readable document. Secrets are not included: configure them again after an import. The import shows a preview first and applies only the sections present in the file."

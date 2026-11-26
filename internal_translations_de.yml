@@ -6834,3 +6834,15 @@ deu:
   "Quarantena i file sospetti": "Verdächtige Dateien in Quarantäne"
   "Solo avviso": "Nur melden"
   "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "Was passiert, wenn ein Download ein Programm oder eine Datei enthält, die dort nicht hingehört. Blockieren entfernt den Torrent und die Teildateien; Quarantäne verschiebt nur die verdächtigen Dateien und behält das gute Video; Nur melden ändert nichts. Ohne gültiges Video ist Quarantäne nicht möglich und der Torrent wird wie zuvor blockiert."
+
+  # portable configuration
+  "Configurazione portabile": "Portable Konfiguration"
+  "Scarica configurazione": "Konfiguration herunterladen"
+  "Documento di configurazione": "Konfigurationsdokument"
+  "Incolla qui il contenuto del file esportato": "Inhalt der exportierten Datei hier einfügen"
+  "Anteprima import": "Importvorschau"
+  "Applica import": "Import anwenden"
+  "Applicare la configurazione importata?": "Importierte Konfiguration anwenden?"
+  "Configurazione importata: %d sezioni applicate.": "Konfiguration importiert: %d Abschnitte angewendet."
+  "Anteprima: %d sezioni pronte, nessuna modifica scritta.": "Vorschau: %d Abschnitte bereit, nichts geschrieben."
+  "Scarica profili, regole, filtri, liste e titoli in un documento leggibile. I segreti non sono inclusi: riconfigurali dopo l'import. L'import mostra prima un'anteprima e applica solo le sezioni presenti.": "Profile, Regeln, Filter, Listen und Titel in einem lesbaren Dokument herunterladen. Geheimnisse sind nicht enthalten: nach dem Import erneut einrichten. Der Import zeigt zuerst eine Vorschau und wendet nur die im Datei vorhandenen Abschnitte an."
