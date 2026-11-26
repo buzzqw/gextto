@@ -878,13 +878,33 @@ function post(url,params){
 function report(res){if(res&&res.msg)toast(res.msg,!res.ok);}
 
 // ---------- rows, selection, filters ----------
-function rows(){return $$('#torrents tbody tr');}
+// rows() skips the virtual spacer rows: they carry no torrent, and letting
+// them into selection or bulk actions would add an undefined hash.
+function rows(){return $$('#torrents tbody tr[data-hash]');}
 function visibleRows(){return rows().filter(function(r){return !r.hidden;});}
+// modelRows is every row the current filter shows, on screen or not. The
+// virtual table keeps only a window in the DOM, so selection, «select all»
+// and shift-range must read the model and never the rendered rows.
+function modelRows(){
+  if(state.virtual)return (state.viewRows||[]).map(function(r){return r.Hash;});
+  return visibleRows().map(function(r){return r.dataset.hash;});
+}
 function rowOf(el){return el&&el.closest?el.closest('#torrents tbody tr'):null;}
 function rowByHash(h){return rows().find(function(r){return r.dataset.hash===h;});}
 function dataByHash(h){
-  if(state.virtual){return state.allRows.find(function(r){return r.Hash===h;})||null;}
-  var r=rowByHash(h);return r?{Name:r.dataset.name,Category:r.dataset.cat,Tags:r.dataset.tags,State:r.dataset.state,AutoTMM:r.dataset.tmm==='1'}:null;
+  if(state.virtual){
+    var d=state.allRows.find(function(r){return r.Hash===h;});
+    if(!d)return null;
+    // A dataset-shaped view, so dialogs and flags read the same fields on a
+    // JSON row (off screen in the virtual table) and on a rendered <tr>.
+    return {Hash:h,Name:d.Name,Category:d.Category,Tags:d.Tags,State:d.State,AutoTMM:!!d.AutoTMM,
+      dataset:{hash:h,name:d.Name,cat:d.Category,tags:d.Tags,state:d.State,
+        tmm:d.AutoTMM?'1':'',pin:d.Pinned?'1':'',seq:d.Sequential?'1':'',fl:d.FirstLast?'1':'',ss:d.SuperSeeding?'1':'',
+        dll:d.DLLimitKib,ull:d.ULLimitKib,kPath:d.SavePath||''}};
+  }
+  var r=rowByHash(h);if(!r)return null;
+  var ds=r.dataset;
+  return {Hash:h,Name:ds.name,Category:ds.cat,Tags:ds.tags,State:ds.state,AutoTMM:ds.tmm==='1',dataset:ds};
 }
 function selHashes(){return Array.from(state.selected);}
 function renderSelection(){
@@ -906,7 +926,7 @@ function renderSelection(){
 }
 function select(hash,mode){
   if(mode==='toggle'){if(state.selected.has(hash))state.selected.delete(hash);else state.selected.add(hash);}
-  else if(mode==='range'&&state.anchor){var v=visibleRows().map(function(r){return r.dataset.hash;});var a=v.indexOf(state.anchor),b=v.indexOf(hash);if(a>=0&&b>=0){var lo=Math.min(a,b),hi=Math.max(a,b);for(var i=lo;i<=hi;i++)state.selected.add(v[i]);}}
+  else if(mode==='range'&&state.anchor){var v=modelRows();var a=v.indexOf(state.anchor),b=v.indexOf(hash);if(a>=0&&b>=0){var lo=Math.min(a,b),hi=Math.max(a,b);for(var i=lo;i<=hi;i++)state.selected.add(v[i]);}}
   else{state.selected.clear();state.selected.add(hash);}
   if(mode!=='range')state.anchor=hash;
   renderSelection();
@@ -1330,15 +1350,15 @@ function showUndo(items){
 }
 function snapshotForUndo(hashes){
   return hashes.map(function(h){
-    if(state.virtual&&state.allRows){var d=state.allRows.find(function(r){return r.Hash===h;});return d?{hash:h,dest:d.SavePath||'',cat:d.Category||'',tags:d.Tags||''}:null;}
-    var r=rowByHash(h);return r?{hash:h,dest:r.dataset.kPath||'',cat:r.dataset.cat||'',tags:r.dataset.tags||''}:null;
+    var d=dataByHash(h);return d?{hash:h,dest:d.dataset.kPath||'',cat:d.dataset.cat||'',tags:d.dataset.tags||''}:null;
   }).filter(Boolean);
 }
-function fetchMagnets(snap){
-  Promise.all(snap.map(function(s){return fetch('/ui/magnet?hash='+encodeURIComponent(s.hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(m){s.magnet=(m||'').trim();return s;}).catch(function(){return s;});})).then(function(items){
-    showUndo(items.filter(function(s){return !!s.magnet;}));
+function loadMagnets(snap){
+  return Promise.all(snap.map(function(s){return fetch('/ui/magnet?hash='+encodeURIComponent(s.hash),{cache:'no-store'}).then(function(r){return r.ok?r.text():null;}).then(function(m){s.magnet=(m||'').trim();return s;}).catch(function(){return s;});})).then(function(items){
+    return items.filter(function(s){return !!s.magnet;});
   });
 }
+function fetchMagnets(snap){return loadMagnets(snap).then(showUndo);}
 function doUndo(){
   var st=undoState;hideUndo();if(!st)return;
   var jobs=st.items.map(function(s){var p=new URLSearchParams();p.set('source',s.magnet);if(s.dest)p.set('destination',s.dest);if(s.cat)p.set('category',s.cat);if(s.tags)p.set('tags',s.tags);p.set('paused','1');return post('/ui/add',p);});
@@ -1375,15 +1395,15 @@ function editCategory(hashes){
   dlg._hashes=hashes;$('input[name=category]',dlg).value=r?r.Category:'';$('input[name=tags]',dlg).value=r?(r.Tags||'').split(',').map(function(s){return s.trim();}).filter(Boolean).join(', '):'';$('input[name=auto_tmm]',dlg).checked=!!(r&&r.AutoTMM);openDialog(dlg);
 }
 function renameTorrentDialog(hashes){
-  var dlg=$('#dlg-rename'),r=rowByHash(hashes[0]);
+  var dlg=$('#dlg-rename'),r=dataByHash(hashes[0]);
   if(!r)return;$('input[name=hash]',dlg).value=r.dataset.hash;$('input[name=name]',dlg).value=r.dataset.name;openDialog(dlg);
 }
 function locationDialog(hashes){
-  var dlg=$('#dlg-location'),r=rowByHash(hashes[0]);dlg._hashes=hashes;
+  var dlg=$('#dlg-location'),r=dataByHash(hashes[0]);dlg._hashes=hashes;
   $('#location-what').textContent=whatSelected(hashes);$('#location-dest').value=r?r.dataset.kPath:'';openDialog(dlg);
 }
 function limitsDialog(hashes){
-  var dlg=$('#dlg-limits'),r=hashes.length===1?rowByHash(hashes[0]):null;dlg._hashes=hashes;
+  var dlg=$('#dlg-limits'),r=hashes.length===1?dataByHash(hashes[0]):null;dlg._hashes=hashes;
   $('#limits-what').textContent=whatSelected(hashes);
   function v(x){x=r?+x:-1;return x<0?'':String(x);}
   var dl=$('#limits-dl'),ul=$('#limits-ul');
@@ -1392,7 +1412,7 @@ function limitsDialog(hashes){
   // different values; saving then brings every selected torrent to one value.
   if(!r){
     var dd={},uu={};
-    hashes.forEach(function(h){var rr=rowByHash(h);if(rr){dd[rr.dataset.dll]=1;uu[rr.dataset.ull]=1;}});
+    hashes.forEach(function(h){var rr=dataByHash(h);if(rr){dd[rr.dataset.dll]=1;uu[rr.dataset.ull]=1;}});
     dl.placeholder=Object.keys(dd).length>1?'mixed':'global';
     ul.placeholder=Object.keys(uu).length>1?'mixed':'global';
   }else{dl.placeholder='global';ul.placeholder='global';}
@@ -1403,7 +1423,7 @@ function globalLimitsDialog(btn){
 }
 // flagState is "true", "false" or "mixed" for a row flag over the selection.
 function flagState(hashes,attr){
-  var on=0;hashes.forEach(function(h){var r=rowByHash(h);if(r&&r.dataset[attr])on++;});
+  var on=0;hashes.forEach(function(h){var r=dataByHash(h);if(r&&r.dataset[attr])on++;});
   return on===0?'false':on===hashes.length?'true':'mixed';
 }
 // toggleFlag switches a per-torrent option: every selected torrent ends in the
@@ -1411,7 +1431,7 @@ function flagState(hashes,attr){
 // torrents that need them.
 function toggleFlag(hashes,attr,onOp,offOp,toggle){
   var target=flagState(hashes,attr)!=='true';
-  var need=hashes.filter(function(h){var r=rowByHash(h);return r&&(!!r.dataset[attr])!==target;});
+  var need=hashes.filter(function(h){var r=dataByHash(h);return r&&(!!r.dataset[attr])!==target;});
   if(toggle)return bulk(onOp,need.length?need:hashes);
   return bulk(target?onOp:offOp,hashes);
 }
@@ -1449,7 +1469,7 @@ function act(op,hashes){
   }
 }
 function setCategory(cat,hashes){
-  Promise.all(hashes.map(function(h){var r=rowByHash(h);return post('/ui/category',{hash:h,category:cat,tags:r?r.dataset.tags:''});})).then(function(r){report(r[r.length-1]);refresh();});
+  Promise.all(hashes.map(function(h){var r=dataByHash(h);return post('/ui/category',{hash:h,category:cat,tags:r?r.dataset.tags:''});})).then(function(r){report(r[r.length-1]);refresh();});
 }
 
 // ---------- dialogs and menus ----------
@@ -1484,7 +1504,7 @@ function openSub(item){
 }
 function buildCatMenu(sub){
   var hashes=$('#row-menu')._hashes||[],cur=null;
-  hashes.forEach(function(h,i){var r=rowByHash(h),c=r?r.dataset.cat:'';cur=i===0?c:(cur===c?cur:undefined);});
+  hashes.forEach(function(h,i){var r=dataByHash(h),c=r?r.dataset.cat:'';cur=i===0?c:(cur===c?cur:undefined);});
   var box=$('#cat-menu-list',sub);box.textContent='';
   $$('#catlist-all option').forEach(function(o){var b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.dataset.setcat=o.value;b.setAttribute('aria-checked',cur===o.value?'true':'false');b.title=o.value;b.innerHTML='<svg class="i"><use href="#i-folder"/></svg>';b.appendChild(document.createTextNode(o.value));box.appendChild(b);});
   var none=$('[data-setcat=""]',sub);if(none)none.setAttribute('aria-checked',cur===''?'true':'false');
@@ -1525,11 +1545,14 @@ $('#dsplit').addEventListener('pointerdown',function(e){e.preventDefault();split
 $('#dsplit').addEventListener('pointermove',function(e){if(splitting)setDrawerHeight(splitting.h+splitting.y-e.clientY);});
 $('#dsplit').addEventListener('pointerup',function(){splitting=null;});
 $('#dsplit').addEventListener('keydown',function(e){var h=$('#drawer').getBoundingClientRect().height;if(e.key==='ArrowUp'){e.preventDefault();setDrawerHeight(h+24);}else if(e.key==='ArrowDown'){e.preventDefault();setDrawerHeight(h-24);}});
+var detailSeq=0;
 function openDetail(hash,tab){
   tab=tab||(state.drawer?state.drawer.tab:'general');
   state.drawer={hash:hash,tab:tab};
+  var seq=++detailSeq;
   var d=$('#drawer');
   return fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text();}).then(function(h){
+    if(seq!==detailSeq)return;
     var wasOpen=!d.hidden;$('#drawer-body').innerHTML=h;d.hidden=false;
     if(!wasOpen){var sp=$('#dsplit');sp.setAttribute('aria-valuenow',Math.round(d.getBoundingClientRect().height));sp.setAttribute('aria-valuemin',120);sp.setAttribute('aria-valuemax',Math.max(160,window.innerHeight-200));}
     if(!wasOpen){var c=$('#drawer [data-close-drawer]');if(c)c.focus();}
@@ -1626,15 +1649,17 @@ function updateFilePick(){var input=$('#add-files'),n=input.files?input.files.le
 // updateFileTree asks the server for the files of the single chosen .torrent,
 // so the operator unchecks what must not be downloaded before adding it. With
 // several files the tree is hidden: the add sends one request per file.
+var fileTreeSeq=0;
 function updateFileTree(){
+  var seq=++fileTreeSeq;
   var tree=$('#add-file-tree');if(!tree)return;
   var input=$('#add-files'),files=input&&input.files?input.files:[];
   if(files.length!==1){tree.hidden=true;tree.innerHTML='';return;}
   var fd=new FormData();fd.set('torrent',files[0]);
   fetch('/ui/add-preview',{method:'POST',body:fd,headers:{'X-GX-Fetch':'1'}})
     .then(function(r){return r.text();})
-    .then(function(html){tree.innerHTML=html;tree.hidden=!html.trim();})
-    .catch(function(){tree.hidden=true;tree.innerHTML='';});
+    .then(function(html){if(seq!==fileTreeSeq)return;tree.innerHTML=html;tree.hidden=!html.trim();})
+    .catch(function(){if(seq!==fileTreeSeq)return;tree.hidden=true;tree.innerHTML='';});
 }
 // ---------- add preview ----------
 // What will be added: each magnet line shows its display name (dn) and info
@@ -1803,7 +1828,7 @@ document.addEventListener('mouseover',function(e){
 document.addEventListener('pointerdown',function(e){var h=e.target.closest&&e.target.closest('#torrents th .rz');if(h){e.preventDefault();startResize(h,e.clientX);}});
 document.addEventListener('change',function(e){
   if(e.target.classList.contains('rowsel')){var r=rowOf(e.target);select(r.dataset.hash,'toggle');return;}
-  if(e.target.id==='selall'){var on=e.target.checked;visibleRows().forEach(function(r){if(on)state.selected.add(r.dataset.hash);else state.selected.delete(r.dataset.hash);});renderSelection();return;}
+  if(e.target.id==='selall'){var on=e.target.checked;modelRows().forEach(function(h){if(on)state.selected.add(h);else state.selected.delete(h);});renderSelection();return;}
   if(e.target.id==='files-all'){$$('#drawer .filesel').forEach(function(c){c.checked=e.target.checked;});return;}
   if(e.target.id==='files-tree'){try{localStorage.setItem('gx-files-tree',e.target.checked?'1':'0');}catch(_){}groupFiles();return;}
   if(e.target.id==='add-files'){updateFilePick();return;}
@@ -1825,7 +1850,17 @@ document.addEventListener('contextmenu',function(e){
 document.addEventListener('submit',function(e){
   var form=e.target;
   if(form.id==='form-add'){e.preventDefault();submitAdd(form);return;}
-  if(form.id==='form-remove'){e.preventDefault();var d=$('#dlg-remove'),hs=d._hashes||[];var delFiles=$('#remove-files').checked;var snap=delFiles?null:snapshotForUndo(hs);closeDialog(d);bulk(delFiles?'remove-files':'remove',hs).then(function(){hs.forEach(function(h){state.selected.delete(h);});if(state.drawer&&hs.indexOf(state.drawer.hash)>=0)closeDetail();if(snap&&snap.length)fetchMagnets(snap);});return;}
+  if(form.id==='form-remove'){e.preventDefault();var d=$('#dlg-remove'),hs=d._hashes||[];var delFiles=$('#remove-files').checked;var snap=delFiles?null:snapshotForUndo(hs);closeDialog(d);
+    // The magnet must be read while the torrent still exists: asking after the
+    // removal made the advertised undo fail with 404 every time.
+    var prepared=(snap&&snap.length)?loadMagnets(snap):Promise.resolve([]);
+    prepared.then(function(items){
+      return bulk(delFiles?'remove-files':'remove',hs).then(function(){
+        hs.forEach(function(h){state.selected.delete(h);});
+        if(state.drawer&&hs.indexOf(state.drawer.hash)>=0)closeDetail();
+        if(items.length)showUndo(items);
+      });
+    });return;}
   if(form.id==='form-cat'){e.preventDefault();var dc=$('#dlg-cat'),cat=$('input[name=category]',dc).value,tags=$('input[name=tags]',dc).value,tmm=$('input[name=auto_tmm]',dc).checked;closeDialog(dc);Promise.all((dc._hashes||[]).map(function(h){var p={hash:h,category:cat,tags:tags};if(tmm)p.auto_tmm='1';return post('/ui/category',p);})).then(function(r){report(r[r.length-1]);refresh();});return;}
   if(form.id==='form-search'){e.preventDefault();runSearch();return;}
   if(form.id==='form-location'||form.id==='form-limits'){
@@ -1875,9 +1910,9 @@ document.addEventListener('keydown',function(e){
     if(e.key==='Enter'){e.preventDefault();select(row.dataset.hash,'only');openDetail(row.dataset.hash);return;}
     if(e.key==='ContextMenu'||(e.shiftKey&&e.key==='F10')){e.preventDefault();var rc=row.getBoundingClientRect();rowMenu(row,rc.left+40,rc.bottom,row);return;}
   }
-  if((e.ctrlKey||e.metaKey)&&(e.key==='a'||e.key==='A')){e.preventDefault();visibleRows().forEach(function(r){state.selected.add(r.dataset.hash);});renderSelection();return;}
+  if((e.ctrlKey||e.metaKey)&&(e.key==='a'||e.key==='A')){e.preventDefault();modelRows().forEach(function(h){state.selected.add(h);});renderSelection();return;}
   if(e.key==='Delete'&&state.selected.size){e.preventDefault();askRemove();return;}
-  if((e.key==='p'||e.key==='P')&&state.selected.size){e.preventDefault();var anyRun=selHashes().some(function(h){var r=rowByHash(h);return r&&r.dataset.state!=='paused';});bulk(anyRun?'pause':'resume');return;}
+  if((e.key==='p'||e.key==='P')&&state.selected.size){e.preventDefault();var anyRun=selHashes().some(function(h){var r=dataByHash(h);return r&&r.dataset.state!=='paused';});bulk(anyRun?'pause':'resume');return;}
 });
 
 // Drag and drop / paste anywhere: .torrent files and magnet links open Add.

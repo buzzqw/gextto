@@ -168,3 +168,59 @@ func TestQbitSearchJobRecordsItsEnd(t *testing.T) {
 		t.Error("a running job was pruned")
 	}
 }
+
+// TestQbitSearchEvictsOldestFinishedAtTheCap: a client that never deletes its
+// jobs must not pin every result in memory. At the cap the oldest finished job
+// makes room, so a new search is still accepted.
+func TestQbitSearchEvictsOldestFinishedAtTheCap(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.qbitSearch = map[int]*qbitSearchJob{}
+	d.qbitSearchSeq = qbitSearchMaxJobs
+	base := time.Now()
+	for i := 1; i <= qbitSearchMaxJobs; i++ {
+		d.qbitSearch[i] = &qbitSearchJob{status: "Stopped", finishedAt: base.Add(time.Duration(i) * time.Second)}
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	var started struct {
+		ID int `json:"id"`
+	}
+	if code := postFormJSON(t, srv.URL+"/api/v2/search/start", url.Values{"pattern": {"anything"}}, &started); code != http.StatusOK || started.ID == 0 {
+		t.Fatalf("search/start at the cap: %d %+v", code, started)
+	}
+
+	d.qbitSearchMu.Lock()
+	defer d.qbitSearchMu.Unlock()
+	if _, ok := d.qbitSearch[1]; ok {
+		t.Error("the oldest finished job survived: the map keeps growing")
+	}
+	if len(d.qbitSearch) != qbitSearchMaxJobs {
+		t.Errorf("jobs = %d, want the cap %d", len(d.qbitSearch), qbitSearchMaxJobs)
+	}
+	if _, ok := d.qbitSearch[started.ID]; !ok {
+		t.Error("the new job is missing")
+	}
+}
+
+// TestQbitSearchRefusesWhenEveryJobIsRunning: with the cap reached and nothing
+// finished to evict, the new request is refused instead of piling up.
+func TestQbitSearchRefusesWhenEveryJobIsRunning(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.qbitSearch = map[int]*qbitSearchJob{}
+	d.qbitSearchSeq = qbitSearchMaxJobs
+	for i := 1; i <= qbitSearchMaxJobs; i++ {
+		d.qbitSearch[i] = &qbitSearchJob{status: "Running"}
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	if code := postFormJSON(t, srv.URL+"/api/v2/search/start", url.Values{"pattern": {"anything"}}, nil); code != http.StatusServiceUnavailable {
+		t.Fatalf("search/start with every job running: %d, want 503", code)
+	}
+	d.qbitSearchMu.Lock()
+	defer d.qbitSearchMu.Unlock()
+	if len(d.qbitSearch) != qbitSearchMaxJobs {
+		t.Errorf("jobs = %d, want the cap %d", len(d.qbitSearch), qbitSearchMaxJobs)
+	}
+}

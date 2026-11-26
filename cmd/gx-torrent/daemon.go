@@ -378,13 +378,21 @@ type Daemon struct {
 	qbitSyncHistory map[int64]*qbitSyncState
 	qbitSyncOrder   []int64
 	// qbitSearch holds the in-memory qBittorrent search jobs (search/start etc.).
-	qbitSearchMu  sync.Mutex
-	qbitSearchSeq int
-	qbitSearch    map[int]*qbitSearchJob
-	// qbitCreate holds the qBittorrent torrent-creator tasks.
-	qbitCreateMu  sync.Mutex
-	qbitCreateSeq int
-	qbitCreate    map[string]*qbitCreateTask
+	// A fixed pool of workers runs them: a client that starts searches in a loop
+	// cannot spawn one goroutine each, and the finished jobs are capped and
+	// evicted (see qbitSearchMaxJobs).
+	qbitSearchMu          sync.Mutex
+	qbitSearchSeq         int
+	qbitSearch            map[int]*qbitSearchJob
+	qbitSearchQueue       chan int
+	qbitSearchWorkersOnce sync.Once
+	// qbitCreate holds the qBittorrent torrent-creator tasks. Also bounded: a
+	// small worker pool builds them and the tasks kept in memory have a cap.
+	qbitCreateMu          sync.Mutex
+	qbitCreateSeq         int
+	qbitCreate            map[string]*qbitCreateTask
+	qbitCreateQueue       chan string
+	qbitCreateWorkersOnce sync.Once
 	// metadata is the TVmaze client for the real episode list (standalone).
 	metadata *tvmaze.Client
 	// watchLast/watchRunning drive the standalone watch-folders scan (off when

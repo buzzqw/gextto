@@ -846,3 +846,30 @@ func TestUITrackerEdit(t *testing.T) {
 		return len(got) == 1 && got[0] == "http://b/announce"
 	})
 }
+
+// TestUIVirtualSelectionReadsTheModel guards the virtual table: with thousands
+// of torrents only a window of rows is in the DOM, so selection, "select all",
+// shift-range and the bulk dialogs must read the model (state.allRows), not the
+// rendered rows. Spacer rows carry no data-hash and must stay out of rows().
+func TestUIVirtualSelectionReadsTheModel(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "internal", "webui", "assets", "ui.tmpl"))
+	if err != nil {
+		t.Skip("page assets are unavailable outside the source tree")
+	}
+	body := string(raw)
+	for _, want := range []string{
+		"function rows(){return $$('#torrents tbody tr[data-hash]');}",
+		"function modelRows(){",
+		"if(state.virtual)return (state.viewRows||[]).map(function(r){return r.Hash;});",
+		"modelRows().forEach(function(h){if(on)state.selected.add(h);else state.selected.delete(h);});",
+		"if((e.ctrlKey||e.metaKey)&&(e.key==='a'||e.key==='A')){e.preventDefault();modelRows().forEach(",
+		"else if(mode==='range'&&state.anchor){var v=modelRows();",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("ui.tmpl lost %q: the selection would read only the rendered rows again", want)
+		}
+	}
+	if strings.Contains(body, "visibleRows().forEach(function(r){if(on)state.selected.add(r.dataset.hash)") {
+		t.Error("the select-all handler is back to the DOM rows: off-screen torrents would be lost")
+	}
+}

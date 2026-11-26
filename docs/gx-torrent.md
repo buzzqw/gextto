@@ -898,6 +898,14 @@ of the page). In managed it is **not** exposed: only Gextto commands.
 Compatibility is verified by tests using Gextto's qBittorrent client
 (`internal/qbittorrent`) against the daemon.
 
+Both surfaces are bounded. Search jobs run on four workers; at most 64 jobs are
+kept, a finished one that the client never deletes expires after 15 minutes, and
+at the cap the oldest finished job makes room. Creator tasks run on two workers;
+at most 32 are kept, a finished task expires after an hour, and at the cap the
+oldest finished task makes room. A request that finds every slot busy is refused
+with 503 instead of piling up work, so a client calling in a loop cannot exhaust
+the daemon's memory or start one disk-wide hashing per request.
+
 ### Adding and creating
 
 The add dialog of the page reads the chosen `.torrent` before adding it

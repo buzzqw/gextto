@@ -873,10 +873,13 @@
   function loadFolderBrowser(overlay) {
     var list = overlay.querySelector("[data-v2-browse-list]");
     var path = overlay.querySelector("[data-v2-browse-path]");
+    // A quick A → B navigation must not be overwritten by A's late answer.
+    var seq = overlay._browseSeq = (overlay._browseSeq || 0) + 1;
     list.textContent = t("Caricamento…");
     fetch("/api/browse_dir?path=" + encodeURIComponent(overlay._current || "") + (overlay._files ? "&files=video" : ""), { credentials: "same-origin" })
       .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || t("Impossibile leggere le cartelle")); return data; }); })
       .then(function (data) {
+        if (seq !== overlay._browseSeq || !overlay.isConnected) return;
         overlay._current = String(data.path || overlay._current || "");
         overlay._parent = data.parent || "";
         path.value = overlay._current;
@@ -911,7 +914,7 @@
         });
         ensureTooltips(overlay);
       })
-      .catch(function (error) { list.textContent = error.message; });
+      .catch(function (error) { if (seq === overlay._browseSeq) list.textContent = error.message; });
   }
   function createFolder(overlay) {
     var name = String(overlay.querySelector("[data-v2-browse-new]").value || "").trim();
@@ -1388,6 +1391,14 @@
   var savingAll = false;
   var pendingDirty = "";
   var focusHeading = false;
+  // The markup of each tracked form before the first edit. It restores list
+  // editors and language combos, which form.reset() alone cannot rebuild.
+  var pristineForms = new WeakMap();
+  function rememberPristine(form) {
+    if (form && form.matches && form.matches(TRACKED) && !pristineForms.has(form)) {
+      pristineForms.set(form, form.innerHTML);
+    }
+  }
 
   function controlDirty(control) {
     if (control.disabled || control.type === "hidden" || control.type === "submit" || control.type === "button") return false;
@@ -1496,6 +1507,10 @@
     return false;
   }
 
+  document.addEventListener("focusin", function (event) {
+    var form = event.target.closest && event.target.closest(TRACKED);
+    if (form) rememberPristine(form);
+  });
   document.addEventListener("input", function (event) {
     var form = event.target.closest && event.target.closest(TRACKED);
     if (!form) return;
@@ -1520,6 +1535,7 @@
     if (view) view.classList.toggle("show-keys", !!on);
   }
   function initSettingsView() {
+    Array.prototype.forEach.call(document.querySelectorAll(TRACKED), rememberPristine);
     var toggle = document.querySelector("[data-v2-show-keys]");
     if (toggle) {
       toggle.checked = storageGet("gextto_settings_keys") === "1";
@@ -1576,11 +1592,14 @@
     if (!batch || batch.pending > 0 || !batch.sent) return;
     var keys = batch.keys;
     var buttons = batch.buttons;
+    var failedKeys = batch.failed;
     batch = null;
     savingAll = false;
     for (var j = 0; j < buttons.length; j++) buttons[j].disabled = false;
-    var failed = keys.map(function (key) { return document.getElementById("v2-setting-" + key); })
-      .filter(function (row) { return row && row.querySelector(".htx-status.err"); });
+    var failed = keys.map(function (key) { return { key: key, row: document.getElementById("v2-setting-" + key) }; })
+      .filter(function (item) { return failedKeys[item.key] || (item.row && item.row.querySelector(".htx-status.err")); })
+      .map(function (item) { return item.row; })
+      .filter(Boolean);
     refreshAll();
     if (failed.length) {
       announce(messageOf("[data-v2-errors-message]") + " " + failed.length);
@@ -1600,7 +1619,7 @@
     for (var i = 0; i < buttons.length; i++) buttons[i].disabled = true;
     savingAll = true;
     var keys = rows.map(function (form) { return form.getAttribute("data-setting-key"); });
-    batch = { keys: keys, waiting: {}, pending: keys.length, sent: false, buttons: buttons };
+    batch = { keys: keys, waiting: {}, failed: {}, pending: keys.length, sent: false, buttons: buttons };
     keys.forEach(function (key) { batch.waiting[key] = true; });
     // One request at a time: every save opens the configuration database.
     var chain = Promise.resolve();
@@ -1609,8 +1628,11 @@
         if (!form.isConnected) return null;
         return window.htmx.ajax("POST", form.getAttribute("hx-post") || "/settings/save", { source: form, target: form, swap: "outerHTML" });
       }).catch(function () {
-        // A failed request leaves the row in place: stop waiting for it.
+        // A failed request leaves the row in place: stop waiting for it and
+        // remember the failure, because no .htx-status.err may be inserted on
+        // a transport error.
         var key = form.getAttribute("data-setting-key");
+        if (batch) batch.failed[key] = true;
         if (batch && batch.waiting[key]) { delete batch.waiting[key]; batch.pending--; }
       });
     });
@@ -1627,8 +1649,15 @@
   }
   function discardAll() {
     dirtyForms().forEach(function (form) {
-      form.reset();
+      if (pristineForms.has(form)) {
+        form.innerHTML = pristineForms.get(form);
+        syncLanguageCombos(form);
+        if (window.htmx) window.htmx.process(form);
+      } else {
+        form.reset();
+      }
       form.removeAttribute("data-v2-force-dirty");
+      markForm(form);
       applyDependents(form);
     });
     refreshAll();
@@ -1687,9 +1716,14 @@
   document.body.addEventListener("htmx:afterRequest", function (event) {
     var detail = event.detail || {};
     var elt = detail.elt;
+    if (batch && elt && elt.getAttribute && elt.getAttribute("data-setting-key") && !detail.successful) {
+      batch.failed[elt.getAttribute("data-setting-key")] = true;
+    }
     if (!elt || !elt.matches || !elt.matches(TRACKED) || !elt.isConnected) return;
     elt.removeAttribute("data-v2-saving");
     if (detail.successful) {
+      // The current markup is the new starting point for a later discard.
+      pristineForms.set(elt, elt.innerHTML);
       // Saved without a swap (hx-swap="none"): the current values become the
       // new baseline.
       for (var i = 0; i < elt.elements.length; i++) {
@@ -1706,6 +1740,10 @@
   document.body.addEventListener("htmx:load", function (event) {
     var elt = event.detail && event.detail.elt;
     if (!elt || !elt.matches) return;
+    rememberPristine(elt);
+    if (elt.querySelectorAll) {
+      Array.prototype.forEach.call(elt.querySelectorAll(TRACKED), rememberPristine);
+    }
     if (pendingDirty) {
       var marked = document.querySelector(pendingDirty);
       if (marked) marked.setAttribute("data-v2-force-dirty", "1");

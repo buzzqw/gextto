@@ -268,3 +268,45 @@ test("un nome di profilo doppio viene segnalato", async ({ page }) => {
   // Nothing was stored: the rejected rows are not in the saved list.
   await expect(page.locator('input[value="E2E Doppio"]')).toHaveCount(0);
 });
+
+test("Salva tutto segnala la riga che non è arrivata al server", async ({ page }) => {
+  // The shared beforeEach route answers every save; this one is registered
+  // later, so it wins, and it aborts one key only: a transport error inserts no
+  // status into the row, which is exactly the case that used to look saved.
+  await page.route("**/settings/save", async (route) => {
+    const form = new URLSearchParams(route.request().postData() || "");
+    if (form.get("key") === "max_release_age_days") {
+      await route.abort();
+      return;
+    }
+    const key = form.get("key") || "";
+    await route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<form class="setting-row" data-setting-key="${key}" id="v2-setting-${key}"><label class="setting-label" id="label-${key}">${key}</label><small class="setting-status" id="status-${key}"><span class="htx-status ok">salvata</span></small></form>`,
+    });
+  });
+  await page.goto("/?view=settings&tab=daemon");
+  await page.locator("#input-refresh_interval").fill("7200");
+  await page.locator("#input-max_release_age_days").fill("30");
+  await page.locator("[data-v2-savebar]").getByRole("button", { name: "Salva tutto" }).click();
+  await expect(page.locator("#v2-settings-live")).toContainText("Impostazioni non salvate per un errore: 1");
+  await expect(page.locator("#v2-setting-max_release_age_days [data-v2-dirty-badge]")).toBeVisible();
+});
+
+test("Annulla modifiche ripristina il campo lingua personalizzato", async ({ page }) => {
+  await page.goto("/?view=settings&tab=rename");
+  // The language row only shows when the cleanup switch is on.
+  const toggle = page.locator("#input-audio_cleanup");
+  if (!(await toggle.isChecked())) await toggle.check();
+  const row = page.locator("#v2-setting-audio_cleanup_language");
+  const select = row.locator("select[data-v2-lang-combo]");
+  const custom = row.locator("[data-v2-lang-custom]");
+  await select.selectOption("__custom__");
+  await expect(custom).toBeVisible();
+  await custom.fill("xyz");
+
+  await page.locator("[data-v2-savebar]").getByRole("button", { name: "Annulla modifiche" }).click();
+  await expect(select).not.toHaveValue("__custom__");
+  await expect(custom).toBeHidden();
+  await expect(page.locator("[data-v2-savebar]")).toBeHidden();
+});

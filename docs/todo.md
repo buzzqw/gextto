@@ -24,7 +24,6 @@ still be true after the item lands does not belong here.
 
 ## gx-torrent daemon
 
-- **qBittorrent search and torrent-creator jobs**: every `search/start` and creator task starts a goroutine with no concurrency limit, finished jobs are pruned only by a new search, and creator tasks keep the whole `.torrent` in memory until deleted. Gate: a bounded worker pool, a job cap and a TTL, with a test of a client that never deletes.
 - **`/sync/maindata` history**: each poll builds a full map of every torrent and keeps up to 16 of them (about 96 MiB at 5,000 torrents). Gate: shared copy-on-write snapshots or per-rid diffs, benchmarked at 1k/5k/10k torrents.
 - **Feed dedupe under the daemon lock**: `markFeedSeen` scans the whole `FeedSeen` map for expired entries on every insert, under `d.mu`. Gate: a periodic sweep outside the lock or time buckets, with API latency measured during a large poll.
 
@@ -39,11 +38,6 @@ still be true after the item lands does not belong here.
 
 ## Interface
 
-- **Off-screen rows in the daemon's virtual list**: bulk actions and the category assignment look rows up in the DOM, so a selection that includes rows not rendered loses them, and spacer rows can enter the selection. Gate: keep the selection by hash in the model, with a Playwright test on 501 rows.
-- **Stale asynchronous answers**: episode editor, `.torrent` preview, details, folders and archive render whatever answer arrives last, so a slow answer for one title can land on another. Gate: a request token or `AbortController` per view, with slow/fast Playwright cases.
-- **Save all and discard changes**: «Salva tutto» can report success when a request failed in transport, and «Annulla modifiche» does not restore structured editors or the custom language field. Gate: per-key success counting and a DOM snapshot restore, with a Playwright test.
-- **Optimistic actions treated as success**: undo after a removal fetches the magnets after they are gone, adding to the archive ignores `ok:false`, and removing from the detail view drops the row before the answer. Gate: act on the answer, with rollback, and tests for HTTP 200 `ok:false` and 500.
-- **Polling in hidden tabs**: the statistics and update pages keep polling without an in-flight guard while the tab is hidden. Gate: pause on `visibilitychange` and serialise the requests.
 - **TUI selection, stream limits and maintenance errors**: a refresh can move the selection after an HTTP/eD2k row is inserted, SSE lines and events have no byte limit, and a backup error is cleared by the next successful maintenance call. Gate: keep the selection by identity, cap lines and events, record errors per endpoint.
 
 ## Release and scripts

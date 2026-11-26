@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -79,5 +80,36 @@ func TestQbitTorrentCreatorAPI(t *testing.T) {
 	getJSONInto(t, srv.URL+"/api/v2/torrentcreator/status", &status)
 	if len(status) != 0 {
 		t.Fatalf("task not deleted: %+v", status)
+	}
+}
+
+// TestQbitCreatorEvictsOldestFinishedAtTheCap: the tasks kept in memory are
+// bounded, and a client that never deletes still gets a new one at the cap.
+func TestQbitCreatorEvictsOldestFinishedAtTheCap(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.qbitCreate = map[string]*qbitCreateTask{}
+	d.qbitCreateSeq = qbitCreateMaxTasks
+	base := time.Now().Unix()
+	for i := 1; i <= qbitCreateMaxTasks; i++ {
+		id := strconv.Itoa(i)
+		d.qbitCreate[id] = &qbitCreateTask{id: id, status: "Finished", timeFinished: base + int64(i)}
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	var started struct {
+		TaskID string `json:"taskID"`
+	}
+	if code := postFormJSON(t, srv.URL+"/api/v2/torrentcreator/addTask",
+		url.Values{"sourcePath": {"/nonexistent/source"}}, &started); code != http.StatusOK || started.TaskID == "" {
+		t.Fatalf("addTask at the cap: %d %+v", code, started)
+	}
+	d.qbitCreateMu.Lock()
+	defer d.qbitCreateMu.Unlock()
+	if _, ok := d.qbitCreate["1"]; ok {
+		t.Error("the oldest finished task survived: the map keeps growing")
+	}
+	if len(d.qbitCreate) != qbitCreateMaxTasks {
+		t.Errorf("tasks = %d, want the cap %d", len(d.qbitCreate), qbitCreateMaxTasks)
 	}
 }

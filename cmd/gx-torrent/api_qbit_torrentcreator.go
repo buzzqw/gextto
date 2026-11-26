@@ -39,6 +39,17 @@ type qbitCreateTask struct {
 	data            []byte
 }
 
+// Creating a torrent hashes a whole folder: a client asking in a loop must not
+// start one goroutine (and one full read of the disk) each. The workers bound
+// the concurrent work, the cap bounds the tasks kept in memory, and the TTL
+// drops the ones a client never deletes. qBittorrent itself keeps a task until
+// deleteTask, so the TTL is generous.
+const (
+	qbitCreateWorkers  = 2
+	qbitCreateMaxTasks = 32
+	qbitCreateTaskTTL  = time.Hour
+)
+
 func (d *Daemon) handleQbitTorrentCreatorAdd(w http.ResponseWriter, r *http.Request) {
 	sourcePath := strings.TrimSpace(r.FormValue("sourcePath"))
 	if sourcePath == "" {
@@ -65,13 +76,20 @@ func (d *Daemon) handleQbitTorrentCreatorAdd(w http.ResponseWriter, r *http.Requ
 		source:          strings.TrimSpace(r.FormValue("source")),
 		trackers:        qbitCreatorURLs(r.FormValue("trackers")),
 		urlSeeds:        qbitCreatorURLs(r.FormValue("urlSeeds")),
-		status:          "Running",
+		status:          "Queued",
 		timeAdded:       now,
-		timeStarted:     now,
 	}
 	d.qbitCreateMu.Lock()
 	if d.qbitCreate == nil {
 		d.qbitCreate = map[string]*qbitCreateTask{}
+	}
+	d.pruneQbitCreateLocked(time.Now())
+	for len(d.qbitCreate) >= qbitCreateMaxTasks {
+		if !d.evictOldestQbitCreateLocked() {
+			d.qbitCreateMu.Unlock()
+			http.Error(w, "too many torrent-creator tasks", http.StatusServiceUnavailable)
+			return
+		}
 	}
 	d.qbitCreateSeq++
 	id := strconv.Itoa(d.qbitCreateSeq)
@@ -79,17 +97,84 @@ func (d *Daemon) handleQbitTorrentCreatorAdd(w http.ResponseWriter, r *http.Requ
 	d.qbitCreate[id] = task
 	d.qbitCreateMu.Unlock()
 
-	go d.qbitCreateRun(id)
+	d.enqueueQbitCreate(id)
 	writeJSON(w, http.StatusOK, map[string]any{"taskID": id})
+}
+
+// pruneQbitCreateLocked drops the finished tasks nobody deleted. Caller holds
+// qbitCreateMu.
+func (d *Daemon) pruneQbitCreateLocked(now time.Time) {
+	for id, task := range d.qbitCreate {
+		if task.timeFinished > 0 && now.Sub(time.Unix(task.timeFinished, 0)) >= qbitCreateTaskTTL {
+			delete(d.qbitCreate, id)
+		}
+	}
+}
+
+// evictOldestQbitCreateLocked makes room by dropping the finished task that has
+// waited longest. Caller holds qbitCreateMu.
+func (d *Daemon) evictOldestQbitCreateLocked() bool {
+	oldestID := ""
+	var oldest int64
+	for id, task := range d.qbitCreate {
+		if task.timeFinished == 0 {
+			continue
+		}
+		if oldestID == "" || task.timeFinished < oldest {
+			oldestID, oldest = id, task.timeFinished
+		}
+	}
+	if oldestID == "" {
+		return false
+	}
+	delete(d.qbitCreate, oldestID)
+	return true
+}
+
+// enqueueQbitCreate starts the worker pool once and hands it the task.
+func (d *Daemon) enqueueQbitCreate(id string) {
+	d.qbitCreateWorkersOnce.Do(func() {
+		d.qbitCreateQueue = make(chan string, qbitCreateMaxTasks)
+		for i := 0; i < qbitCreateWorkers; i++ {
+			go d.qbitCreateWorker()
+		}
+	})
+	select {
+	case d.qbitCreateQueue <- id:
+	default:
+		// Defensive: fail the task instead of leaving it Queued forever.
+		d.qbitCreateMu.Lock()
+		if task := d.qbitCreate[id]; task != nil {
+			task.status = "Failed"
+			task.errorMsg = "the creator queue is full"
+			task.timeFinished = time.Now().Unix()
+		}
+		d.qbitCreateMu.Unlock()
+	}
+}
+
+func (d *Daemon) qbitCreateWorker() {
+	for id := range d.qbitCreateQueue {
+		d.qbitCreateMu.Lock()
+		task := d.qbitCreate[id]
+		d.qbitCreateMu.Unlock()
+		if task == nil {
+			continue
+		}
+		d.qbitCreateRun(id)
+	}
 }
 
 func (d *Daemon) qbitCreateRun(id string) {
 	d.qbitCreateMu.Lock()
 	task := d.qbitCreate[id]
-	d.qbitCreateMu.Unlock()
 	if task == nil {
+		d.qbitCreateMu.Unlock()
 		return
 	}
+	task.status = "Running"
+	task.timeStarted = time.Now().Unix()
+	d.qbitCreateMu.Unlock()
 	data, err := torrent.CreateTorrent(task.sourcePath, torrent.CreateOptions{
 		Trackers:    task.trackers,
 		Webseeds:    task.urlSeeds,

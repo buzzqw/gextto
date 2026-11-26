@@ -35,8 +35,10 @@ type qbitSearchResult struct {
 // indexers are queried, "Stopped" once done (or stopped by the client).
 type qbitSearchJob struct {
 	pattern string
+	plugins []string
 	status  string
 	results []qbitSearchResult
+	ctx     context.Context
 	cancel  context.CancelFunc
 	// finishedAt is when the job reached "Stopped": the results stay for the
 	// client to read, but not forever (see qbitSearchJobTTL).
@@ -55,6 +57,16 @@ const qbitSearchJobTTL = 15 * time.Minute
 // deadline).
 const qbitSearchTimeout = 90 * time.Second
 
+// qbitSearchWorkers and qbitSearchMaxJobs bound the work a client can ask for:
+// a search start is cheap for the caller but costs indexer requests, memory for
+// the results and a goroutine. Without a pool, a client calling search/start in
+// a loop would spawn an unbounded number of them, and a client that never
+// deletes its jobs would keep every result forever.
+const (
+	qbitSearchWorkers = 4
+	qbitSearchMaxJobs = 64
+)
+
 func (d *Daemon) handleQbitSearchStart(w http.ResponseWriter, r *http.Request) {
 	pattern := strings.TrimSpace(r.FormValue("pattern"))
 	plugins := splitFormList(r.FormValue("plugins"))
@@ -64,14 +76,94 @@ func (d *Daemon) handleQbitSearchStart(w http.ResponseWriter, r *http.Request) {
 	if d.qbitSearch == nil {
 		d.qbitSearch = map[int]*qbitSearchJob{}
 	}
-	d.pruneQbitSearchLocked(time.Now())
+	now := time.Now()
+	d.pruneQbitSearchLocked(now)
+	// At the cap the oldest finished job makes room: a client that never
+	// deletes still gets to search, and only the results of an old search are
+	// lost. With every job still running the request is refused.
+	for len(d.qbitSearch) >= qbitSearchMaxJobs {
+		if !d.evictOldestQbitSearchLocked() {
+			d.qbitSearchMu.Unlock()
+			cancel()
+			http.Error(w, "too many search jobs", http.StatusServiceUnavailable)
+			return
+		}
+	}
 	d.qbitSearchSeq++
 	id := d.qbitSearchSeq
-	d.qbitSearch[id] = &qbitSearchJob{pattern: pattern, status: "Running", cancel: cancel}
+	d.qbitSearch[id] = &qbitSearchJob{pattern: pattern, plugins: plugins, status: "Running", ctx: ctx, cancel: cancel}
 	d.qbitSearchMu.Unlock()
 
-	go d.qbitRunSearch(ctx, id, pattern, plugins)
+	d.enqueueQbitSearch(id)
 	writeJSON(w, http.StatusOK, map[string]any{"id": id})
+}
+
+// enqueueQbitSearch starts the worker pool once and hands it the job. The
+// queue cannot fill: every enqueued job is still in the map, whose size is
+// checked against the same cap before the insert.
+func (d *Daemon) enqueueQbitSearch(id int) {
+	d.qbitSearchWorkersOnce.Do(func() {
+		d.qbitSearchQueue = make(chan int, qbitSearchMaxJobs)
+		for i := 0; i < qbitSearchWorkers; i++ {
+			go d.qbitSearchWorker()
+		}
+	})
+	select {
+	case d.qbitSearchQueue <- id:
+	default:
+		// Defensive: finish the job instead of leaving it "Running" forever.
+		d.qbitSearchMu.Lock()
+		if job := d.qbitSearch[id]; job != nil {
+			job.status = "Stopped"
+			job.finishedAt = time.Now()
+			if job.cancel != nil {
+				job.cancel()
+			}
+		}
+		d.qbitSearchMu.Unlock()
+	}
+}
+
+func (d *Daemon) qbitSearchWorker() {
+	for id := range d.qbitSearchQueue {
+		d.qbitSearchMu.Lock()
+		job := d.qbitSearch[id]
+		pattern, plugins := "", []string(nil)
+		ctx := context.Background()
+		runnable := false
+		if job != nil {
+			pattern, plugins = job.pattern, job.plugins
+			if job.ctx != nil {
+				ctx = job.ctx
+			}
+			runnable = job.status == "Running"
+		}
+		d.qbitSearchMu.Unlock()
+		if !runnable {
+			continue
+		}
+		d.qbitRunSearch(ctx, id, pattern, plugins)
+	}
+}
+
+// evictOldestQbitSearchLocked drops the finished job whose results have been
+// waiting longest, to make room for a new one. Caller holds qbitSearchMu.
+func (d *Daemon) evictOldestQbitSearchLocked() bool {
+	oldestID := 0
+	var oldest time.Time
+	for id, job := range d.qbitSearch {
+		if job.status != "Stopped" || job.finishedAt.IsZero() {
+			continue
+		}
+		if oldestID == 0 || job.finishedAt.Before(oldest) {
+			oldestID, oldest = id, job.finishedAt
+		}
+	}
+	if oldestID == 0 {
+		return false
+	}
+	delete(d.qbitSearch, oldestID)
+	return true
 }
 
 // pruneQbitSearchLocked drops the finished jobs nobody deleted. It runs when a
@@ -133,7 +225,9 @@ func (d *Daemon) qbitRunSearch(ctx context.Context, id int, pattern string, plug
 	if job := d.qbitSearch[id]; job != nil {
 		job.results = results
 		job.status = "Stopped"
-		job.cancel = nil
+		// cancel stays: the deferred release calls it, and a second call is
+		// safe. ctx goes: nothing may reuse a finished job's deadline.
+		job.ctx = nil
 		job.finishedAt = time.Now()
 	}
 	d.qbitSearchMu.Unlock()

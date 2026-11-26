@@ -217,7 +217,7 @@
                 <div class="torrent-head">
                   <span class="torrent-select"><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="{{tr "Seleziona %s" .Name}}" {{trTitle "Seleziona questo torrent per le azioni di gruppo"}} /></span>
                   <span class="torrent-name">
-                    <button class="torrent-open" type="button" id="v2-open-{{.Hash}}" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" {{trTitle .Name}}><span class="truncate">{{tr .Name}}</span></button>
+                    <button class="torrent-open" type="button" id="v2-open-{{.Hash}}" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-detail-drawer" hx-swap="innerHTML" hx-sync="#v2-detail-drawer:replace" {{trTitle .Name}}><span class="truncate">{{tr .Name}}</span></button>
                     {{if .Archived}}<span class="badge ok" {{trTitle "Copia archiviata presente"}}>{{tr "NAS"}}</span>{{end}}
         {{if eq .Network "ed2k"}}<span class="badge" {{trTitle "Rete eD2k/Kad"}}>{{tr "eD2k"}}</span> <span class="badge" {{trTitle "Fonti eD2k"}}>{{tr .Sources}}</span>{{end}}
                     {{if .LastResort}}<span class="badge warn" {{trTitle "Ultima risorsa: episodio mancante preso fuori dalla risoluzione del profilo perché era l'unica copia nella lingua richiesta. L'upgrade lo sostituisce appena esce una copia nel profilo."}}>{{icon "i-sos"}} {{tr "ultima risorsa"}}</span>{{end}}
