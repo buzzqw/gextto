@@ -503,6 +503,8 @@ The suite has 3,010 Go tests in 72 packages, 79 Playwright tests and 89 Go bench
   single pass on a public swarm says a feature works, not which value is better.
 - **Measure the system as it really runs**, on a quiet host, with queues and auto-management
   on.
+- **Run both passes on a quiet night** with `scripts/nightly-benchmarks.sh`: it waits for the
+  load to settle, turns media integrity off for the round and puts the previous value back.
 - **Write the machine, date and command next to a number**, and replace the old row.
 - **Keep this page readable.** A number goes here only if a reader can decide something from
   it; the rest stays in `gextto-data/bench/` and in the command that produces it.
