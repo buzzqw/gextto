@@ -180,7 +180,10 @@ stay narrow and the tables remain readable.
 - **Alignment**: files are mapped onto piece boundaries and pieces **do not**
   span two files; the **last piece of a file may be shorter** than `piece
   length` and carries no padding. gx-core therefore uses a **per-file piece
-  model** (not concatenated with synthetic padding).
+  model** (not concatenated with synthetic padding), and the same model drives
+  file selection, piece priorities, selected and completed bytes (also while
+  the torrent is stopped), per-file progress and streaming ranges: a v2-only
+  torrent is never read as one continuous stream.
 - **Peer extensions**: `hash request` (21), `hashes` (22), `hash reject` (23),
   used to fetch a peer's `piece layers` (BEP 9 carries the info dict).
 - **Hybrids**: an info dict with both fields; v1 = SHA-1 and v2 = SHA-256 over

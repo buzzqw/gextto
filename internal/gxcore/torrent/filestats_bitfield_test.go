@@ -17,8 +17,9 @@ func TestFileStatsFromPieces(t *testing.T) {
 		{Path: "c", Length: 0},
 		{Path: "d", Length: 5},
 	}
+	info := &metainfo.Info{Files: files, PieceLength: 10, NumPieces: 6, Length: 55}
 	have := map[uint32]bool{0: true, 2: true, 3: true, 4: true}
-	stats := fileStatsFromPieces(files, 10, func(index uint32) bool { return have[index] })
+	stats := fileStatsFromLayout(info, func(index uint32) bool { return have[index] })
 	want := map[string]int64{"a": 15, "b": 20, "c": 0, "d": 0}
 	if len(stats) != len(want) {
 		t.Fatalf("got %d files, want %d (padding excluded)", len(stats), len(want))
@@ -29,7 +30,7 @@ func TestFileStatsFromPieces(t *testing.T) {
 		}
 	}
 	have[5] = true
-	for _, stat := range fileStatsFromPieces(files, 10, func(index uint32) bool { return have[index] }) {
+	for _, stat := range fileStatsFromLayout(info, func(index uint32) bool { return have[index] }) {
 		if stat.Path() == "d" && stat.BytesCompleted != 5 {
 			t.Errorf("d: completed %d, want 5", stat.BytesCompleted)
 		}

@@ -773,31 +773,24 @@ func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
 	if t.info() == nil || t.bitfield == nil || t.info().PieceLength == 0 {
 		return nil, errors.New("torrent not running so file stats unavailable")
 	}
-	return fileStatsFromPieces(t.info().Files, int64(t.info().PieceLength), t.bitfield.Test), nil
+	return fileStatsFromLayout(t.info(), t.bitfield.Test), nil
 }
 
-// fileStatsFromPieces lays files end to end (padding included in the piece
-// stream) and counts completed bytes per non-padding file.
-func fileStatsFromPieces(files []metainfo.File, pieceLength int64, done func(uint32) bool) []FileStats {
-	stats := make([]FileStats, 0, len(files))
-	var offset int64
-	for _, f := range files {
-		start, end := offset, offset+f.Length
-		offset = end
+// fileStatsFromLayout counts completed bytes per non-padding file from the
+// verified pieces, for either piece layout.
+func fileStatsFromLayout(info *metainfo.Info, done func(uint32) bool) []FileStats {
+	completed := make([]int64, len(info.Files))
+	forEachFilePiece(info, func(fi int, p uint32, n int64) {
+		if done(p) {
+			completed[fi] += n
+		}
+	})
+	stats := make([]FileStats, 0, len(info.Files))
+	for fi, f := range info.Files {
 		if f.Padding {
 			continue
 		}
-		var completed int64
-		if f.Length > 0 {
-			for index := start / pieceLength; index*pieceLength < end; index++ {
-				if !done(uint32(index)) {
-					continue
-				}
-				pieceStart, pieceEnd := index*pieceLength, (index+1)*pieceLength
-				completed += min(pieceEnd, end) - max(pieceStart, start)
-			}
-		}
-		stats = append(stats, FileStats{File: File{path: f.Path, length: f.Length}, BytesCompleted: completed})
+		stats = append(stats, FileStats{File: File{path: f.Path, length: f.Length}, BytesCompleted: completed[fi]})
 	}
 	return stats
 }

@@ -1161,7 +1161,12 @@ func (d *Daemon) adjustStatsLocked(t *torrent.Torrent, stats torrent.Stats) torr
 	meta := d.metaLocked(t)
 	running := isRunning(stats.Status)
 	done := stats.Bytes.Completed
-	if !running || done == 0 {
+	// The engine counts verified bytes from the piece layout, also while
+	// stopped; the estimate is only for when it knows nothing yet. Taking the
+	// larger of the two, as before, let "pieces × piece length" — wrong for
+	// the short per-file tails of a v2 torrent — report a stopped download
+	// with a missing tail as complete.
+	if done == 0 {
 		estimate := int64(stats.Pieces.Have) * int64(stats.PieceLength)
 		if stats.Pieces.Total > 0 && stats.Pieces.Have >= stats.Pieces.Total {
 			estimate = total

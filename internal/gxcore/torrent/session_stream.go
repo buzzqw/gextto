@@ -9,33 +9,34 @@ func (t *torrent) filePieceRange(fileIndex int, offset, length int64) (uint32, u
 	if t.info() == nil || fileIndex < 0 || length <= 0 || t.info().PieceLength == 0 {
 		return 0, 0, false
 	}
-	// The user-facing file index skips the padding files, which still count for
-	// the absolute byte offset.
-	var absolute int64
-	var index int
-	found := false
-	for _, f := range t.info().Files {
+	// The user-facing file index skips the padding files.
+	infoIndex, index := -1, 0
+	for i, f := range t.info().Files {
 		if f.Padding {
-			absolute += f.Length
 			continue
 		}
 		if index == fileIndex {
-			found = true
+			infoIndex = i
 			break
 		}
-		absolute += f.Length
 		index++
 	}
+	first, count, inFirst, found := filePieceBounds(t.info(), infoIndex)
 	if !found {
 		return 0, 0, false
 	}
-	start := absolute + offset
-	if start < 0 {
-		start = 0
+	if offset < 0 {
+		offset = 0
 	}
+	// Offsets are relative to the first piece of the file: in a v2-only
+	// torrent each file starts on a fresh piece, in v1 it can start inside one.
 	pl := int64(t.info().PieceLength)
-	begin := uint32(start / pl)
-	end := uint32((start+length-1)/pl) + 1
+	start := inFirst + offset
+	begin := first + uint32(start/pl)
+	end := first + uint32((start+length-1)/pl) + 1
+	if limit := first + count; end > limit {
+		end = limit
+	}
 	if end > t.info().NumPieces {
 		end = t.info().NumPieces
 	}

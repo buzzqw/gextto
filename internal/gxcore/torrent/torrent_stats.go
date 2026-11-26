@@ -255,10 +255,32 @@ func (t *torrent) avaliablePieceCount() uint32 {
 	return t.piecePicker.Available()
 }
 
-// bytesComplete totals verified bytes, prorating the tail piece.
+// bytesComplete totals verified bytes, prorating the tail piece. A stopped
+// torrent has no pieces in memory: the lengths then come from the layout, so
+// the count stays exact instead of dropping to zero (and a caller estimating
+// "pieces × piece length" would over-count the short tails of a v2 torrent).
 func (t *torrent) bytesComplete() int64 {
-	if t.bitfield == nil || len(t.pieces) == 0 {
+	if t.bitfield == nil || t.info() == nil {
 		return 0
+	}
+	if len(t.pieces) == 0 {
+		var n int64
+		forEachPieceLength(t.info(), func(i uint32, length int64) {
+			if i < t.bitfield.Len() && t.bitfield.Test(i) {
+				n += length
+			}
+		})
+		return n
+	}
+	if t.info().V2 {
+		// Every file of a v2-only torrent ends on its own short piece.
+		var n int64
+		for i := range t.pieces {
+			if uint32(i) < t.bitfield.Len() && t.bitfield.Test(uint32(i)) {
+				n += int64(t.pieces[i].Length)
+			}
+		}
+		return n
 	}
 	n := int64(t.info().PieceLength) * int64(t.bitfield.Count())
 	if t.bitfield.Test(t.bitfield.Len() - 1) {

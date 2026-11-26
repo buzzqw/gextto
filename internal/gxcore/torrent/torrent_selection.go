@@ -106,21 +106,12 @@ func (t *torrent) piecePriorities() []uint8 {
 	if prio == nil || t.info() == nil {
 		return nil
 	}
-	pieceLength := int64(t.info().PieceLength)
 	out := make([]uint8, t.info().NumPieces)
-	var offset int64
-	for i, f := range t.info().Files {
-		start, end := offset, offset+f.Length
-		offset = end
-		if f.Padding || f.Length == 0 || prio[i] <= 0 {
-			continue
+	forEachFilePiece(t.info(), func(fi int, p uint32, _ int64) {
+		if fi < len(prio) && prio[fi] > 0 && int(p) < len(out) && uint8(prio[fi]) > out[p] {
+			out[p] = uint8(prio[fi])
 		}
-		for p := start / pieceLength; p <= (end-1)/pieceLength && p < int64(len(out)); p++ {
-			if uint8(prio[i]) > out[p] {
-				out[p] = uint8(prio[i])
-			}
-		}
-	}
+	})
 	return out
 }
 
@@ -200,19 +191,12 @@ func (t *torrent) skippedPieces(skipFiles []bool) []bool {
 	if skipFiles == nil || t.info() == nil {
 		return nil
 	}
-	pieceLength := int64(t.info().PieceLength)
 	wanted := make([]bool, t.info().NumPieces)
-	var offset int64
-	for i, f := range t.info().Files {
-		start, end := offset, offset+f.Length
-		offset = end
-		if f.Padding || skipFiles[i] || f.Length == 0 {
-			continue
-		}
-		for p := start / pieceLength; p <= (end-1)/pieceLength && p < int64(len(wanted)); p++ {
+	forEachFilePiece(t.info(), func(fi int, p uint32, _ int64) {
+		if (fi >= len(skipFiles) || !skipFiles[fi]) && int(p) < len(wanted) {
 			wanted[p] = true
 		}
-	}
+	})
 	skip := make([]bool, len(wanted))
 	for i := range wanted {
 		skip[i] = !wanted[i]
@@ -319,7 +303,7 @@ func (t *torrent) selectedBytes() (total, done int64) {
 	}
 	skip := t.skipMask()
 	pieceLength := int64(t.info().PieceLength)
-	if n := t.info().NumPieces; skip == nil && n > 0 && (t.bitfield == nil || t.bitfield.Len() == n) {
+	if n := t.info().NumPieces; skip == nil && !t.info().V2 && n > 0 && (t.bitfield == nil || t.bitfield.Len() == n) {
 		// Every piece wanted: the size of the torrent, and the done pieces
 		// from a popcount instead of a test per piece.
 		lastLength := t.info().Length - pieceLength*int64(n-1)
@@ -334,18 +318,16 @@ func (t *torrent) selectedBytes() (total, done int64) {
 		}
 		return total, done
 	}
-	for i := uint32(0); i < t.info().NumPieces; i++ {
-		if skip != nil && skip[i] {
-			continue
-		}
-		length := pieceLength
-		if i == t.info().NumPieces-1 {
-			length = t.info().Length - pieceLength*int64(t.info().NumPieces-1)
+	// v2-only pieces end at every file's tail, so the length of each piece
+	// comes from the layout, not from "full except the last one".
+	forEachPieceLength(t.info(), func(i uint32, length int64) {
+		if skip != nil && int(i) < len(skip) && skip[i] {
+			return
 		}
 		total += length
-		if t.bitfield != nil && t.bitfield.Test(i) {
+		if t.bitfield != nil && i < t.bitfield.Len() && t.bitfield.Test(i) {
 			done += length
 		}
-	}
+	})
 	return total, done
 }
