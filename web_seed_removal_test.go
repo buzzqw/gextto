@@ -610,7 +610,8 @@ func TestRemoveCompletedKeepsInfiniteSeeds(t *testing.T) {
 		v := view
 		v.SeedRatio, v.SeedDays = tc.ratio, tc.days
 		engine := &mockTorrentEngine{torrents: []models.TorrentView{v}, removed: map[string]bool{}}
-		s := &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+		s := &AppState{torrent_engine: engine, db: db, cfg: cfg}
+		pinStateConfig(t, s)
 		req := httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
 		RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
 		if _, got := engine.removed[seedTestHash]; got != tc.wantRemoved {
@@ -627,7 +628,8 @@ func TestRemoveCompletedWaitsForEveryLimit(t *testing.T) {
 	view.State = "seeding"
 
 	engine := &mockTorrentEngine{torrents: []models.TorrentView{view}, removed: map[string]bool{}}
-	s := &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+	s := &AppState{torrent_engine: engine, db: db, cfg: cfg}
+	pinStateConfig(t, s)
 	req := httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
 	RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
 	if _, got := engine.removed[seedTestHash]; got {
@@ -636,7 +638,8 @@ func TestRemoveCompletedWaitsForEveryLimit(t *testing.T) {
 
 	view.SeedingSeconds = 365 * 86_400
 	engine = &mockTorrentEngine{torrents: []models.TorrentView{view}, removed: map[string]bool{}}
-	s = &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+	s = &AppState{torrent_engine: engine, db: db, cfg: cfg}
+	pinStateConfig(t, s)
 	req = httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
 	RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
 	if _, got := engine.removed[seedTestHash]; !got {
@@ -658,7 +661,8 @@ func TestRemoveCompletedDropsSupersededArchive(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine := &mockTorrentEngine{torrents: []models.TorrentView{view}, removed: map[string]bool{}}
-	s := &AppState{torrent_engine: engine, db: db, cfg: cfg, config_path: filepath.Join(t.TempDir(), "missing.toml")}
+	s := &AppState{torrent_engine: engine, db: db, cfg: cfg}
+	pinStateConfig(t, s)
 	req := httptest.NewRequest(http.MethodPost, "/api/torrents/remove_completed", strings.NewReader(`{"delete_files":false}`))
 	RemoveCompletedTorrents(httptest.NewRecorder(), req, s)
 	if _, got := engine.removed[seedTestHash]; !got {

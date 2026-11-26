@@ -256,7 +256,7 @@ gofmt -w changed.go
 make test                 # pure Go: check-ui + installer self-test + test-dht + Go tests (root package split across processes)
 make test-serial          # the same with a plain CGO_ENABLED=0 go test ./...
 make test-engine            # tests of the gx-core engine
-make test-ui              # UI end2end (Playwright): pages, mobile, a11y (needs Node + a browser)
+make test-ui              # UI end2end (Playwright): pages, mobile, a11y (needs Node + a browser; the audio-cleanup spec also needs ffprobe, ffmpeg and mkvmerge, and skips without them)
 CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (a C compiler)
 node --check uiweb/v2/static/v2-core.js
 git diff --check
@@ -271,8 +271,12 @@ through a package variable the test sets, as the eD2k search timing does
 The pacing waits that every test should skip (retry back-offs, per-host gaps,
 polls) are shortened once in `main_test.go` (`TestMain`) of the root package
 and of `cmd/gx-torrent`; a test about one of those waits sets the variable
-itself. `make test-ui` runs three groups (three daemons and three Chromium):
-the mini PC it runs on does not take more.
+itself. A state built by hand must pin its configuration (`pinStateConfig`):
+a request reads it through `LatestConfig`, which reloads the file named by the
+state and, without one, the defaults of the working directory plus `./data` —
+present and populated on a developer machine, absent in CI. `make test-ui` runs
+three groups (three daemons and three Chromium): the mini PC it runs on does not
+take more.
 
 The end-to-end suite is under `uiweb/end2end` (Playwright + Node). `make test-ui`
 builds the daemon and gx-torrent in a temporary directory of the run (never in

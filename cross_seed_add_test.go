@@ -119,6 +119,9 @@ func crossSeedAddEnv(t *testing.T, crossSeed bool, have, total int) (*AppState, 
 	cfg.StateDir = t.TempDir()
 	engine := &crossSeedEngine{views: map[string]models.TorrentView{}, have: have, total: total}
 	state := &AppState{db: db, cfg: &cfg, torrent_engine: engine}
+	// The action reads its configuration through LatestConfig: without a file
+	// of its own the state would reload `./data` instead of this one.
+	pinStateConfig(t, state)
 	return state, engine, hash, "first:Tracker One"
 }
 
@@ -181,6 +184,8 @@ func TestCrossSeedStartNeedsHnRConfirmationWithFiniteTargets(t *testing.T) {
 	state, engine, hash, source := crossSeedAddEnv(t, true, 8, 8)
 	state.cfg.Transfer.SeedRatio = 0.5
 	state.cfg.Transfer.SeedTimeDays = 365
+	// The new limits must reach the configuration the action reloads.
+	pinStateConfig(t, state)
 	_, err := crossSeedStart(context.Background(), state, hash, source, "Example.Show.S01E02.1080p", false)
 	if err == nil || !strings.Contains(err.Error(), "hit-and-run") {
 		t.Fatalf("err = %v, want the hit-and-run confirmation gate", err)

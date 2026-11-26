@@ -119,6 +119,33 @@ func newTestAppState(t *testing.T) *AppState {
 	return state
 }
 
+// pinStateConfig points the state at a configuration file of its own that
+// carries exactly the configuration it has in memory.
+//
+// LatestConfig reloads the configuration whenever the generation changes, so a
+// state without a file of its own reloads the defaults of the working directory
+// plus whatever `./data` holds: on a developer machine that folder exists and
+// carries real settings, in CI it does not, and the same test would then read
+// two different configurations. The file keeps the test independent of both,
+// and its data directory stays inside the test's temporary folder so the
+// reload does not read `./data/gextto_config.db` either.
+func pinStateConfig(t *testing.T, state *AppState) {
+	t.Helper()
+	if state.cfg == nil {
+		t.Fatal("pinStateConfig: the state carries no configuration")
+	}
+	state.cfg.DataDir = t.TempDir()
+	payload, err := json.Marshal(state.cfg)
+	if err != nil {
+		t.Fatalf("pinStateConfig: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "gextto.json")
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
+		t.Fatalf("pinStateConfig: %v", err)
+	}
+	state.config_path = path
+}
+
 // webGet performs a GET against the test server and returns status, headers and
 // body.
 func webGet(t *testing.T, server *httptest.Server, path string) (int, http.Header, []byte) {
