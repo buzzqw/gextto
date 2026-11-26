@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -137,6 +138,59 @@ func TestLoginBareHostnameKeepsConfiguredBaseURL(t *testing.T) {
 	}
 	if searches.Load() != 1 {
 		t.Fatalf("searches = %d, want the configured /api/v1 endpoint to be used", searches.Load())
+	}
+}
+
+func TestLoginIgnoresCrossOriginBaseURL(t *testing.T) {
+	var foreignCalls, configuredCalls atomic.Int32
+	foreign := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		foreignCalls.Add(1)
+		_, _ = io.WriteString(w, `{"data":[]}`)
+	}))
+	defer foreign.Close()
+	configured := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" {
+			_, _ = io.WriteString(w, `{"token":"token","base_url":"`+foreign.URL+`"}`)
+			return
+		}
+		configuredCalls.Add(1)
+		_, _ = io.WriteString(w, `{"data":[]}`)
+	}))
+	defer configured.Close()
+
+	client, err := New(Config{BaseURL: configured.URL, APIKey: "key", Username: "user", Password: "pass", Client: configured.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Search(context.Background(), SearchQuery{Title: "Example"}); err != nil {
+		t.Fatal(err)
+	}
+	if foreignCalls.Load() != 0 || configuredCalls.Load() != 1 {
+		t.Fatalf("foreign=%d configured=%d, want the configured origin only", foreignCalls.Load(), configuredCalls.Load())
+	}
+}
+
+func TestDownloadRejectsCrossOriginPrivateLink(t *testing.T) {
+	var calls atomic.Int32
+	private := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = io.WriteString(w, "1\n00:00:00,000 --> 00:00:01,000\nPrivate\n")
+	}))
+	defer private.Close()
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"link":"`+private.URL+`/sub.srt","file_name":"sub.srt"}`)
+	}))
+	defer provider.Close()
+
+	client, err := New(Config{BaseURL: provider.URL, APIKey: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Download(context.Background(), 1, "srt"); err == nil {
+		t.Fatal("a cross-origin private download link must be refused")
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("private target received %d requests", calls.Load())
 	}
 }
 
@@ -276,5 +330,45 @@ func TestAnonymousSearchUsesOnlyTheAPIKey(t *testing.T) {
 	}
 	if _, err := client.Search(context.Background(), SearchQuery{Title: "Example"}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDownloadRejectsANameThatResolvesToAPrivateAddress(t *testing.T) {
+	var calls atomic.Int32
+	private := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = io.WriteString(w, "1\n00:00:00,000 --> 00:00:01,000\nPrivate\n")
+	}))
+	defer private.Close()
+	_, port, _ := net.SplitHostPort(strings.TrimPrefix(private.URL, "http://"))
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A host name, not an IP literal: only the dial-time check sees
+		// that it lands on loopback.
+		_, _ = io.WriteString(w, `{"link":"http://localhost:`+port+`/sub.srt","file_name":"sub.srt"}`)
+	}))
+	defer provider.Close()
+
+	client, err := New(Config{BaseURL: provider.URL, APIKey: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Download(context.Background(), 1, "srt"); err == nil {
+		t.Fatal("a download link whose name resolves to loopback must be refused")
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("private target received %d requests", calls.Load())
+	}
+}
+
+func TestPublicAddressClassification(t *testing.T) {
+	for raw, want := range map[string]bool{
+		"8.8.8.8": true, "2001:4860:4860::8888": true,
+		"127.0.0.1": false, "10.1.2.3": false, "192.168.1.10": false, "172.16.0.1": false,
+		"169.254.169.254": false, "100.64.0.1": false, "0.0.0.0": false,
+		"::1": false, "fd00::1": false, "fe80::1": false,
+	} {
+		if got := publicAddress(net.ParseIP(raw)); got != want {
+			t.Fatalf("publicAddress(%s) = %v, want %v", raw, got, want)
+		}
 	}
 }

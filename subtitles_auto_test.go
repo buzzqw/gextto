@@ -126,6 +126,54 @@ func TestAutomaticSubtitlesRefuseLowConfidenceMatches(t *testing.T) {
 	}
 }
 
+func TestSubtitleSidecarPresentUsesLiteralNamesAndPreferences(t *testing.T) {
+	dir := t.TempDir()
+	video := filepath.Join(dir, "Example [2024].S01E01.mkv")
+	if err := os.WriteFile(video, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	forced := filepath.Join(dir, "Example [2024].S01E01.ita.forced.srt")
+	if err := os.WriteFile(forced, []byte("forced"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prefs := subtitlePreferences{Forced: "no", SDH: "any"}
+	if subtitleSidecarPresent(video, "it", prefs) {
+		t.Fatal("a forced-only sidecar satisfied a non-forced preference")
+	}
+	prefs.Forced = "yes"
+	if !subtitleSidecarPresent(video, "it", prefs) {
+		t.Fatal("the forced sidecar was not found literally")
+	}
+}
+
+func TestAutomaticSubtitlesRefuseSizeOnlyMatch(t *testing.T) {
+	state, video := automaticSubtitleState(t, "ita")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/subtitles":
+			_, _ = io.WriteString(w, `{"data":[{"id":"10","attributes":{"language":"it","release":"Example.S01E01","files":[{"file_id":20,"file_name":"sub.srt"}],"moviehash_match":false,"moviebytesize_match":true,"foreign_parts_only":false,"hearing_impaired":false}}]}`)
+		case "/download":
+			_, _ = io.WriteString(w, `{"link":"http://`+r.Host+`/sub.srt","file_name":"sub.srt"}`)
+		case "/sub.srt":
+			_, _ = io.WriteString(w, "1\n00:00:00,000 --> 00:00:01,000\nWrong match\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	added, err := runAutomaticSubtitles(context.Background(), automaticSubtitleConfig(state, server.URL), state.db, newSubtitleAutoState(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added != 0 {
+		t.Fatalf("automatic subtitles accepted a size-only match: added=%d", added)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(video), "Show.S01E01.ita.srt")); err == nil {
+		t.Fatal("a size-only match wrote a subtitle")
+	}
+}
+
 func TestAutomaticSubtitlesCooldownAfterAMiss(t *testing.T) {
 	state, video := automaticSubtitleState(t, "ita")
 	var calls atomic.Int32

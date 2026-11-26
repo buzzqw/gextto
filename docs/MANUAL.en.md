@@ -1733,17 +1733,22 @@ test search downloads no subtitles.
 
 Languages are chosen on each series or movie, in the *Subtitles* field: when you
 fill it, Gextto looks for those subtitles on every cycle and writes an `.srt`
-next to the video as soon as it finds a reliable match by hash or file size. An
-existing subtitle is never touched, and a title with no result is left alone for
-a while before it is tried again. If you list more than one language, for
+next to the video as soon as it finds a reliable match by file hash: size alone
+is not enough, because different episodes and versions can weigh the same, and
+those results stay in the manual preview. An existing subtitle, in the language
+and with the forced/SDH variants you asked for, is never touched, and a title
+with no result is left alone for a while before it is tried again. If you list more than one language, for
 example `ita,eng`, it looks for one of each.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads
 nothing. **Apply** confirms the download and writes an `.srt` next to the video,
 with suffixes such as `.ita.forced.sdh.srt`; if the file exists you must
-explicitly tick **Replace if it exists**. The subtitle then follows the normal
-video rename and upgrade paths.
+explicitly tick **Replace if it exists**; two applies on the same file at the
+same time do not overwrite each other. The provider's download links cannot
+point into your local network, and credentials are never sent to an address
+other than the configured one. The subtitle then follows the normal video rename
+and upgrade paths.
 
 ## 18. Notifications
 

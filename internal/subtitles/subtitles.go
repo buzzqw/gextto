@@ -10,12 +10,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -119,12 +121,12 @@ type Subtitle struct {
 	Season         int        `json:"season"`
 	Episode        int        `json:"episode"`
 	FeatureDetails struct {
-		Title     string `json:"title"`
-		MovieName string `json:"movie_name"`
-		Year      int    `json:"year"`
+		Title     string         `json:"title"`
+		MovieName string         `json:"movie_name"`
+		Year      int            `json:"year"`
 		IMDbID    flexibleString `json:"imdb_id"`
-		Season    int    `json:"season_number"`
-		Episode   int    `json:"episode_number"`
+		Season    int            `json:"season_number"`
+		Episode   int            `json:"episode_number"`
 	} `json:"feature_details"`
 	DownloadCount     int   `json:"download_count"`
 	HearingImpaired   *bool `json:"hearing_impaired"`
@@ -184,13 +186,15 @@ func New(cfg Config) (*Client, error) {
 		cfg.UserAgent = "Gextto"
 	}
 	if cfg.Client == nil {
+		origin, _ := url.Parse(cfg.BaseURL)
 		cfg.Client = &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: newSubtitleTransport(origin),
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 10 {
 					return errors.New("too many redirects")
 				}
-				if len(via) > 0 && !strings.EqualFold(req.URL.Host, via[0].URL.Host) {
+				if len(via) > 0 && !sameOrigin(via[0].URL, req.URL) {
 					req.Header.Del("Api-Key")
 					req.Header.Del("Authorization")
 				}
@@ -199,6 +203,69 @@ func New(cfg Config) (*Client, error) {
 		}
 	}
 	return &Client{cfg: cfg, baseURL: cfg.BaseURL}, nil
+}
+
+func sameOrigin(left, right *url.URL) bool {
+	return left != nil && right != nil &&
+		strings.EqualFold(left.Scheme, right.Scheme) &&
+		strings.EqualFold(left.Host, right.Host)
+}
+
+// subtitleTransport keeps a self-hosted provider on its configured private
+// address usable, but sends every other origin — the download links the
+// provider hands back — through a dialer that refuses loopback, private,
+// link-local and other non-public addresses. The check runs on the address
+// actually dialled, after resolution, so a name that resolves to a public
+// address for a pre-check and to a private one for the connection (DNS
+// rebinding) is still refused. Redirects are covered: every hop is a new
+// RoundTrip.
+type subtitleTransport struct {
+	origin  *url.URL
+	trusted http.RoundTripper
+	public  http.RoundTripper
+}
+
+func newSubtitleTransport(origin *url.URL) *subtitleTransport {
+	public := http.DefaultTransport.(*http.Transport).Clone()
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control:   refuseNonPublicDial,
+	}
+	public.DialContext = dialer.DialContext
+	public.Proxy = nil // a proxy would hide the real destination from the check
+	return &subtitleTransport{origin: origin, trusted: http.DefaultTransport, public: public}
+}
+
+func (t *subtitleTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if sameOrigin(t.origin, req.URL) {
+		return t.trusted.RoundTrip(req)
+	}
+	return t.public.RoundTrip(req)
+}
+
+// cgnatBlock is the shared address space of carrier-grade NAT (RFC 6598): not
+// private by Go's definition, but never a public subtitle host either.
+var cgnatBlock = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
+
+// refuseNonPublicDial is a net.Dialer Control hook: address is the resolved
+// ip:port about to be connected.
+func refuseNonPublicDial(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !publicAddress(ip) {
+		return errors.New("subtitle download link points to a non-public address")
+	}
+	return nil
+}
+
+func publicAddress(ip net.IP) bool {
+	return ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLoopback() &&
+		!ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() && !ip.IsUnspecified() &&
+		!cgnatBlock.Contains(ip)
 }
 
 func (c *Client) endpoint(path string) string {
@@ -277,7 +344,11 @@ func (c *Client) login(ctx context.Context) error {
 	c.mu.Lock()
 	c.token = strings.TrimSpace(payload.Token)
 	if base := normalizeBaseURL(payload.BaseURL); base != "" {
-		c.baseURL = base
+		configured, configuredErr := url.Parse(c.cfg.BaseURL)
+		candidate, candidateErr := url.Parse(base)
+		if configuredErr == nil && candidateErr == nil && sameOrigin(configured, candidate) {
+			c.baseURL = base
+		}
 	}
 	c.mu.Unlock()
 	return nil

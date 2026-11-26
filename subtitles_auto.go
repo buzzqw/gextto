@@ -60,18 +60,56 @@ func (s *subtitleAutoState) mark(key string, now time.Time) {
 	s.mu.Unlock()
 }
 
-// subtitleSidecarPresent reports whether a subtitle is already next to the
-// video, in the requested language or untagged. An existing sidecar is never
-// overwritten by the unattended download.
-func subtitleSidecarPresent(videoPath, language string) bool {
+// subtitleSidecarPresent reports whether a compatible subtitle is already next
+// to the video. Names are checked literally: a title may contain glob
+// metacharacters, and forced/SDH preferences must match the existing sidecar.
+func subtitleSidecarPresent(videoPath, language string, prefs subtitlePreferences) bool {
 	stem := strings.TrimSuffix(filepath.Base(videoPath), filepath.Ext(videoPath))
 	dir := filepath.Dir(videoPath)
-	matches, _ := filepath.Glob(filepath.Join(dir, stem+"."+language+"*.srt"))
-	if len(matches) > 0 {
+	present := func(name string) bool {
+		_, err := os.Stat(filepath.Join(dir, name))
+		return err == nil
+	}
+	// An untagged sidecar is a complete, non-SDH subtitle.
+	if prefs.Forced != "yes" && prefs.SDH != "yes" && present(stem+".srt") {
 		return true
 	}
-	if _, err := os.Stat(filepath.Join(dir, stem+".srt")); err == nil {
-		return true
+	// The name Gextto writes uses the normalised code; a sidecar placed by
+	// another program may carry the code as configured. Both count.
+	codes := []string{subtitleLanguageSuffix(language)}
+	if raw := strings.ToLower(strings.TrimSpace(language)); raw != "" && raw != codes[0] {
+		codes = append(codes, raw)
+	}
+	for _, code := range codes {
+		if subtitleSidecarVariantPresent(present, stem+"."+code, prefs) {
+			return true
+		}
+	}
+	return false
+}
+
+// subtitleSidecarVariantPresent checks the forced/SDH variants of one
+// language base name that the preferences accept.
+func subtitleSidecarVariantPresent(present func(string) bool, base string, prefs subtitlePreferences) bool {
+	for _, forced := range []bool{false, true} {
+		if prefs.Forced == "yes" && !forced || prefs.Forced == "no" && forced {
+			continue
+		}
+		for _, sdh := range []bool{false, true} {
+			if prefs.SDH == "yes" && !sdh || prefs.SDH == "no" && sdh {
+				continue
+			}
+			name := base
+			if forced {
+				name += ".forced"
+			}
+			if sdh {
+				name += ".sdh"
+			}
+			if present(name + ".srt") {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -181,7 +219,7 @@ func runAutomaticSubtitles(ctx context.Context, cfg *Config, db *Database, state
 			if attempts >= subtitleAutoMaxPerCycle {
 				return added, nil
 			}
-			if subtitleSidecarPresent(target.VideoPath, language) {
+			if subtitleSidecarPresent(target.VideoPath, language, prefs) {
 				continue
 			}
 			key := target.VideoPath + "|" + language
@@ -200,7 +238,7 @@ func runAutomaticSubtitles(ctx context.Context, cfg *Config, db *Database, state
 				best := candidates[0]
 				// Unattended writes need a strong match: a plain title hit is
 				// left to the preview, where the operator decides.
-				if best.HashMatch || best.SizeMatch {
+				if best.HashMatch {
 					_, err = applySubtitle(ctx, cfg, db, target, best.FileID, language, best.IsForced(), best.IsSDH(), false)
 					if err == nil {
 						added++

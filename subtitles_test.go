@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -95,6 +97,50 @@ func TestSubtitleSearchAndExplicitApply(t *testing.T) {
 	}
 	if _, err := applySubtitle(context.Background(), cfg, state.db, target, 20, "it", false, false, true); err != nil {
 		t.Fatalf("replace apply: %v", err)
+	}
+}
+
+func TestWriteSubtitleAtomicKeepIsExclusive(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Example.ita.srt")
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	cfg.CleanupAction = "delete"
+	payloads := [][]byte{[]byte(strings.Repeat("A", 256<<10)), []byte(strings.Repeat("B", 256<<10))}
+	start := make(chan struct{})
+	errs := make(chan error, len(payloads))
+	var wg sync.WaitGroup
+	for _, payload := range payloads {
+		wg.Add(1)
+		go func(data []byte) {
+			defer wg.Done()
+			<-start
+			errs <- writeSubtitleAtomic(path, data, false, &cfg)
+		}(payload)
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	successes, collisions := 0, 0
+	for err := range errs {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, errSubtitleCollision):
+			collisions++
+		default:
+			t.Fatal(err)
+		}
+	}
+	if successes != 1 || collisions != 1 {
+		t.Fatalf("successes=%d collisions=%d, want one exclusive write", successes, collisions)
+	}
+}
+
+func TestValidateSubtitleSRTRejectsInvalidUTF8AfterBOM(t *testing.T) {
+	data := append([]byte{0xef, 0xbb, 0xbf}, []byte("1\n00:00:00,000 --> 00:00:01,000\n\xff\n")...)
+	if err := validateSubtitleSRT(data); err == nil {
+		t.Fatal("invalid UTF-8 after a BOM must be rejected")
 	}
 }
 

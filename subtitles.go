@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -28,6 +29,11 @@ const (
 )
 
 var errSubtitleCollision = errors.New("subtitle already exists")
+
+// subtitleWriteMu makes the existence check and final rename one operation for
+// every subtitle writer in this daemon. The instance lock prevents a second
+// daemon from sharing the data directory.
+var subtitleWriteMu sync.Mutex
 
 type subtitlePreferences struct {
 	Enabled                                 bool
@@ -391,10 +397,10 @@ func validateSubtitleSRT(data []byte) error {
 	if len(data) == 0 || len(data) > 4<<20 {
 		return errors.New("subtitle file is empty or too large")
 	}
-	if !utf8.Valid(data) && !strings.HasPrefix(string(data), "\xef\xbb\xbf") {
+	text := strings.TrimPrefix(string(data), "\xef\xbb\xbf")
+	if !utf8.ValidString(text) {
 		return errors.New("subtitle file is not valid UTF-8")
 	}
-	text := strings.TrimPrefix(string(data), "\xef\xbb\xbf")
 	if !strings.Contains(text, "-->") {
 		return errors.New("subtitle file has no SRT timing lines")
 	}
@@ -402,6 +408,9 @@ func validateSubtitleSRT(data []byte) error {
 }
 
 func writeSubtitleAtomic(path string, data []byte, replace bool, cfg *Config) error {
+	subtitleWriteMu.Lock()
+	defer subtitleWriteMu.Unlock()
+
 	path = filepath.Clean(path)
 	if hasParentComponent(path) {
 		return errors.New("invalid subtitle path")

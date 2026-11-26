@@ -1755,9 +1755,11 @@ non scarica sottotitoli.
 
 Le lingue si scelgono su ogni serie o film, nel campo *Sottotitoli*: se lo
 compili, Gextto cerca quei sottotitoli a ogni ciclo e scrive un `.srt` accanto
-al video quando trova una corrispondenza sicura per hash o dimensione del file.
-Un sottotitolo già presente non viene mai toccato e un titolo senza risultati
-viene lasciato in pace per un po' prima di riprovare. Se indichi più lingue,
+al video quando trova una corrispondenza sicura per hash del file: la sola
+dimensione non basta, perché episodi e versioni diverse possono pesare uguale,
+e quei risultati restano nell'anteprima manuale. Un sottotitolo già presente,
+nella lingua e con le varianti forced/SDH che hai chiesto, non viene mai toccato
+e un titolo senza risultati viene lasciato in pace per un po' prima di riprovare. Se indichi più lingue,
 per esempio `ita,eng`, ne cerca una per ciascuna.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
@@ -1765,8 +1767,11 @@ un'anteprima con lingua, release, motivo della corrispondenza e nome del file
 che verrebbe creato. L'anteprima non scarica nulla. **Applica** conferma il
 download e scrive un `.srt` accanto al video, con suffissi come
 `.ita.forced.sdh.srt`; se il file esiste, devi spuntare esplicitamente
-**Sostituisci se esiste**. I sottotitoli seguono poi le normali rinomine e gli
-upgrade del video.
+**Sostituisci se esiste**; due applicazioni contemporanee sullo stesso file non
+si sovrascrivono. I link di download del provider non possono puntare alla tua
+rete locale, e le credenziali non vengono mai inviate a un indirizzo diverso da
+quello configurato. I sottotitoli seguono poi le normali rinomine e gli upgrade
+del video.
 
 ## 18. Notifiche
 
