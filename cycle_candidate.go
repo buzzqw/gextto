@@ -74,6 +74,27 @@ type candidateRun struct {
 	archiveIndex  *models.ArchiveQualityIndex
 	movieArchive  *models.ArchiveQuality
 	forbidUpgrade bool
+
+	// packAnnounced and packNameIsAuthoritative remember that a pack's season
+	// came from the torrent name instead of the announcement. The explanation
+	// belongs to the download line, not to every candidate that is then
+	// skipped because the library already has it.
+	packAnnounced           string
+	packNameIsAuthoritative bool
+}
+
+// reconcilePackIdentity records once that the torrent's own name was used to
+// decide which seasons a pack holds. It is called again when a deferred link
+// is opened, but the first announcement stays the one worth explaining.
+func (r *candidateRun) reconcilePackIdentity() {
+	announced, changed := reconcilePackIdentityFromMagnet(&r.release)
+	if !changed {
+		return
+	}
+	if r.packAnnounced == "" {
+		r.packAnnounced = announced
+	}
+	r.packNameIsAuthoritative = true
 }
 
 // try evaluates one candidate release and, when it wins, starts its download:
@@ -150,7 +171,7 @@ func (r *candidateRun) prepareLink() bool {
 	if r.deferredHash == "" && !r.resolveLink() {
 		return false
 	}
-	reconcilePackIdentityFromMagnet(release)
+	r.reconcilePackIdentity()
 	return true
 }
 
@@ -240,7 +261,7 @@ func (r *candidateRun) resolveDeferred() bool {
 		logging.Debug("the downloaded torrent has another infohash than the one declared",
 			"target", releaseTarget(&r.release), "declared", r.deferredHash, "real", hash)
 	}
-	reconcilePackIdentityFromMagnet(&r.release)
+	r.reconcilePackIdentity()
 	r.deferredHash = ""
 	r.provisional = false
 	return true
@@ -430,6 +451,10 @@ func (r *candidateRun) start(approvalContext *models.ApprovalContext, approvalRe
 		if hash, ok := releaseHash(release); ok {
 			_ = p.db.SetTorrentReason(hash, decisionReason)
 		}
+	}
+	if r.packNameIsAuthoritative {
+		logging.Info(fmt.Sprintf("🔧 The announcement says «%s», but the torrent holds «%s»: Gextto uses the name inside the torrent to decide which episodes the pack contains",
+			r.packAnnounced, logTarget(release)))
 	}
 	why := downloadWhy(release, approvalReason, fromArchive, r.gapEpisodes, approvalContext.Archive)
 	if stallApplies {

@@ -1822,14 +1822,18 @@ func stalledAlternativeContext(cfg *Config, db *Database, torrents TorrentSessio
 }
 
 // reconcilePackIdentityFromMagnet prefers the torrent display name's season and
-// episode range over the (possibly wrong) indexer title for season packs.
-func reconcilePackIdentityFromMagnet(release *models.Release) {
+// episode range over the (possibly wrong) indexer title for season packs. It
+// returns what the announcement promised and whether the identity changed: the
+// caller explains the correction once, only if the pack is really downloaded.
+// Logging it here repeated the same unactionable warning every search cycle
+// for packs already in the library.
+func reconcilePackIdentityFromMagnet(release *models.Release) (string, bool) {
 	if release.Kind != "series" || !release.IsPack {
-		return
+		return "", false
 	}
 	parsed, err := url.Parse(release.Magnet)
 	if err != nil {
-		return
+		return "", false
 	}
 	displayName := ""
 	found := false
@@ -1841,14 +1845,16 @@ func reconcilePackIdentityFromMagnet(release *models.Release) {
 		}
 	}
 	if !found || strings.TrimSpace(displayName) == "" || displayName == release.Title {
-		return
+		return "", false
 	}
+	announced := logTarget(release)
 	corrected := ReconcilePackIdentity(release, displayName)
 	if corrected == nil {
-		return
+		return "", false
 	}
-	logging.Warn(fmt.Sprintf("🔧 «%s» is named «%s» in the torrent: the pack is filed by the torrent name", release.Title, displayName))
+	logging.Debug("pack identity taken from the torrent name", "announced", announced, "torrent_name", displayName)
 	*release = *corrected
+	return announced, true
 }
 
 // episodesLabel renders `1,2,3`, or `none` when empty; avoids `[]` in the log.

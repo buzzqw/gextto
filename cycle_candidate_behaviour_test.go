@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/models"
@@ -139,6 +140,23 @@ func TestCandidateRefusedWhenTheLibraryHoldsBetter(t *testing.T) {
 	}
 }
 
+// candidatePass builds the pass one candidate is evaluated with.
+func (e *candidateEnv) candidatePass() *candidatePass {
+	return &candidatePass{
+		cfg: &e.cfg, engine: e.state.engine, db: e.state.db, archive: e.state.archive,
+		notifier: e.state.notifier, torrents: e.torrents, stats: &models.CycleStats{},
+		blocklistedHashes: map[string]struct{}{}, blocklistedTitles: map[string]struct{}{},
+		gapTargets: map[gapTarget]struct{}{}, quarantinedLinks: map[string]string{},
+		readyPending:      map[string]struct{}{},
+		liveDownloads:     &models.LiveDownloads{Hashes: map[string]struct{}{}, Episodes: map[models.LiveEpisodeKey]struct{}{}},
+		stallAlternatives: map[models.LiveEpisodeKey]int64{},
+		emptyArchiveIndex: &models.ArchiveQualityIndex{},
+		archiveIndexCache: map[string]*models.ArchiveQualityIndex{},
+		movieArchiveCache: map[string]*models.ArchiveQuality{},
+		linkFailures:      map[string]map[string]struct{}{},
+	}
+}
+
 // tryWithMirror runs one candidate through the pass directly: its `.torrent`
 // link answers an error, and its mirror carries a magnet. infoHash is the hash
 // the indexer declared for the link ("" for a link without one).
@@ -157,25 +175,72 @@ func (e *candidateEnv) tryWithMirror(t *testing.T, infoHash string) *models.Cycl
 	release.Source = "dead-indexer"
 	mirror.Source = "mirror-indexer"
 	release.Mirrors = []models.Release{mirror}
-	stats := &models.CycleStats{}
-	pass := &candidatePass{
-		cfg: &e.cfg, engine: e.state.engine, db: e.state.db, archive: e.state.archive,
-		notifier: e.state.notifier, torrents: e.torrents, stats: stats,
-		blocklistedHashes: map[string]struct{}{}, blocklistedTitles: map[string]struct{}{},
-		gapTargets: map[gapTarget]struct{}{}, quarantinedLinks: map[string]string{},
-		readyPending:      map[string]struct{}{},
-		liveDownloads:     &models.LiveDownloads{Hashes: map[string]struct{}{}, Episodes: map[models.LiveEpisodeKey]struct{}{}},
-		stallAlternatives: map[models.LiveEpisodeKey]int64{},
-		emptyArchiveIndex: &models.ArchiveQualityIndex{},
-		archiveIndexCache: map[string]*models.ArchiveQualityIndex{},
-		movieArchiveCache: map[string]*models.ArchiveQuality{},
-		linkFailures:      map[string]map[string]struct{}{},
-	}
+	pass := e.candidatePass()
 	stop, err := pass.try(context.Background(), release)
 	if err != nil || stop {
 		t.Fatalf("try: stop %v, err %v", stop, err)
 	}
-	return stats
+	return pass.stats
+}
+
+// A pack announced with more seasons than the torrent contains is filed by
+// the name inside the torrent. That correction is explained once, when the
+// pack is actually downloaded: a pack the cycle refuses must not repeat the
+// same warning at every search.
+func TestPackNamedByTheTorrentIsExplainedOnlyWhenStarted(t *testing.T) {
+	announcedTitle := "Series.A.S01-S02.1080p.WEB-DL.GROUP"
+	torrentName := "Series.A.S01.1080p.WEB-DL.GROUP"
+	magnet := "magnet:?xt=urn:btih:" + candidateHash + "&dn=" + torrentName
+
+	t.Run("refused pack", func(t *testing.T) {
+		e := newCandidateEnv(t)
+		release := ParseRelease(announcedTitle, magnet, "test")
+		if release == nil || !release.IsPack {
+			t.Fatal("the announced title must parse as a pack")
+		}
+		pass := e.candidatePass()
+		pass.blocklistedHashes[candidateHash] = struct{}{}
+		captured := captureLog(t)
+		stop, err := pass.try(context.Background(), *release)
+		if err != nil || stop {
+			t.Fatalf("try: stop %v, err %v", stop, err)
+		}
+		if got := e.torrents.adds.Load(); got != 0 {
+			t.Fatalf("a blocklisted pack was added %d time(s)", got)
+		}
+		if strings.Contains(captured.String(), "The announcement says") {
+			t.Fatalf("a pack that did not start still explained its identity: %s", captured.String())
+		}
+	})
+
+	t.Run("started pack", func(t *testing.T) {
+		e := newCandidateEnv(t)
+		release := ParseRelease(announcedTitle, magnet, "test")
+		captured := captureLog(t)
+		stop, err := e.candidatePass().try(context.Background(), *release)
+		if err != nil || stop {
+			t.Fatalf("try: stop %v, err %v", stop, err)
+		}
+		if got := e.torrents.adds.Load(); got != 1 {
+			t.Fatalf("adds = %d, want the pack started once", got)
+		}
+		explained := 0
+		for _, line := range strings.Split(captured.String(), "\n") {
+			if !strings.Contains(line, "The announcement says") {
+				continue
+			}
+			explained++
+			if !strings.Contains(line, "Series A seasons 1–2") || !strings.Contains(line, "Series A season 1") {
+				t.Fatalf("the explanation does not say what changed: %s", line)
+			}
+			if !strings.Contains(line, "uses the name inside the torrent") {
+				t.Fatalf("the explanation does not say why: %s", line)
+			}
+		}
+		if explained != 1 {
+			t.Fatalf("identity explained %d times, want 1; log: %s", explained, captured.String())
+		}
+	})
 }
 
 // A `.torrent` link that fails falls back to the same release from another
