@@ -121,7 +121,14 @@ func (q *audioCleanupQueueState) worker() {
 		q.process(job, cfg, db)
 
 		q.mu.Lock()
+		// Clear the slot before dropping it: a re-slice alone keeps every
+		// finished job (with its options) alive in the backing array until
+		// the queue empties.
+		q.jobs[0] = audioCleanupJob{}
 		q.jobs = q.jobs[1:]
+		if len(q.jobs) == 0 {
+			q.jobs = nil
+		}
 		delete(q.queued, audioCleanupJobKey(job.Path))
 		q.saveLocked()
 		q.mu.Unlock()
@@ -147,7 +154,9 @@ func (q *audioCleanupQueueState) saveLocked() {
 		}
 		return
 	}
-	data, err := json.MarshalIndent(q.jobs, "", "  ")
+	// Compact: the file is rewritten after every job and nobody reads it by
+	// hand, so indentation would only multiply the bytes written.
+	data, err := json.Marshal(q.jobs)
 	if err != nil {
 		return
 	}
