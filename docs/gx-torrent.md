@@ -1035,7 +1035,9 @@ feeds box, which groups them.
 A worker (every `feed-interval-secs`, default 180 minutes, editable from the
 RSS page in minutes) downloads every active feed, applies `include`/`exclude` on the
 title and adds magnets and `.torrent`s not seen yet (the list of already added
-items is persisted, so a restart does not re-propose them). `disabled: true`
+items is persisted, so a restart does not re-propose them; it keeps thirty days
+of entries, swept at most once every ten minutes, so a poll that adds many
+releases does not walk the whole list under the daemon lock for each one). `disabled: true`
 suspends a feed's automatic checks without deleting it (qBittorrent's *disable feed*;
 the row's ↻ button still works). Every item read also ends up in the **feed
 archive** (below). On the page appear a *Feeds* box with *Check feeds* and

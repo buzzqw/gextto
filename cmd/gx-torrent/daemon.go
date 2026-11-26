@@ -423,6 +423,11 @@ type Daemon struct {
 	// feedPace spaces the requests to one site and cools down the hosts that
 	// answer 429 (see feed_pace.go).
 	feedPace *feedPacer
+	// feedSeenPruned is when FeedSeen was last scanned for expired entries.
+	// The scan is linear in the map size and runs under d.mu, so a poll that
+	// adds many items amortises it instead of rescanning on every insert
+	// (see feedSeenPruneEvery).
+	feedSeenPruned time.Time
 	// dhtFeedMu serialises the DHT feed publications: the sequence must grow
 	// and one publish at a time keeps it monotonic.
 	dhtFeedMu sync.Mutex

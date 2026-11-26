@@ -121,6 +121,33 @@ check_install() {
   capture bash "$INSTALL" --dry-run --listen not-a-port --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --listen without a port is rejected" 1 "must end with a port"
 
+  # A path with a space or a % must not break the unit: systemd quotes
+  # Environment=/ExecStart= values and doubles %, while a single-path setting
+  # keeps its spaces and only doubles %.
+  capture env GEXTTO_PRINT_UNIT=1 bash "$INSTALL" --dry-run \
+    --data-dir "$TMP/data dir %x" --install-dir "$TMP/opt dir"
+  expect "$label: --dry-run can print the unit" 0
+  if contains "Environment=GEXTTO_DATA_DIR=\"$TMP/data dir %%x\""; then
+    pass "$label: the data directory is quoted in Environment"
+  else
+    fail "$label: the data directory is quoted in Environment"
+  fi
+  if contains "ExecStart=\"$TMP/opt dir/gexttod\""; then
+    pass "$label: the binary path is quoted in ExecStart"
+  else
+    fail "$label: the binary path is quoted in ExecStart"
+  fi
+  if contains "WorkingDirectory=$TMP/data dir %%x"; then
+    pass "$label: WorkingDirectory keeps its spaces and escapes %"
+  else
+    fail "$label: WorkingDirectory keeps its spaces and escapes %"
+  fi
+  if contains "PathExists=$TMP/data dir %%x/update-request"; then
+    pass "$label: the update trigger path is escaped"
+  else
+    fail "$label: the update trigger path is escaped"
+  fi
+
   capture bash "$INSTALL" --dry-run --uninstall --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --dry-run --uninstall works" 0 "uninstalled"
 
@@ -176,6 +203,20 @@ check_user_install() {
   capture bash "$USER_INSTALL" --dry-run --port 8081 --listen 127.0.0.1:8181 --data-dir "$TMP/udata"
   expect "$label: --listen overrides the port-derived address" 0 "127.0.0.1:8181"
 
+  capture env GEXTTO_PRINT_UNIT=1 bash "$USER_INSTALL" --dry-run \
+    --data-dir "$TMP/udata dir %x" --binary "$TMP/ubin dir/gexttod"
+  expect "$label: --dry-run can print the unit" 0
+  if contains "ExecStart=\"$TMP/ubin dir/gexttod\""; then
+    pass "$label: the binary path is quoted in ExecStart"
+  else
+    fail "$label: the binary path is quoted in ExecStart"
+  fi
+  if contains "Environment=GEXTTO_DATA_DIR=\"$TMP/udata dir %%x\""; then
+    pass "$label: the data directory is quoted in Environment"
+  else
+    fail "$label: the data directory is quoted in Environment"
+  fi
+
   # Nothing may be written to the (overridden) unit directory by a dry-run.
   if [[ -e "$XDG_CONFIG_HOME/systemd/user/gextto.service" ]]; then
     fail "$label: --dry-run left a unit behind"
@@ -205,6 +246,16 @@ check_package_script() {
   expect "package-gx-torrent-windows.sh: syntax" 0
   capture bash "$ROOT/scripts/package-gx-torrent-windows.sh" --output
   expect "package-gx-torrent-windows.sh: missing option value is rejected" 2 "requires a value"
+
+  capture bash -n "$ROOT/scripts/install-tmp-cleaner.sh"
+  expect "install-tmp-cleaner.sh: syntax" 0
+  capture env XDG_CONFIG_HOME="$TMP/tmpclean-xdg" bash "$ROOT/scripts/install-tmp-cleaner.sh" --dry-run
+  expect "install-tmp-cleaner.sh: --dry-run prints the units" 0 'ExecStart="'
+  if [[ -e "$TMP/tmpclean-xdg/systemd/user/tmp-clean.service" ]]; then
+    fail "install-tmp-cleaner.sh: --dry-run wrote a unit"
+  else
+    pass "install-tmp-cleaner.sh: --dry-run writes nothing"
+  fi
 
   capture bash "$ROOT/scripts/release-manifest.sh" --build 12 --commits 2 --output "$TMP/release.json"
   expect "release-manifest.sh: writes the manifest" 0 "manifest:"

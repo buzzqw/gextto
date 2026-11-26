@@ -25,7 +25,6 @@ still be true after the item lands does not belong here.
 ## gx-torrent daemon
 
 - **`/sync/maindata` history**: each poll builds a full map of every torrent and keeps up to 16 of them (about 96 MiB at 5,000 torrents). Gate: shared copy-on-write snapshots or per-rid diffs, benchmarked at 1k/5k/10k torrents.
-- **Feed dedupe under the daemon lock**: `markFeedSeen` scans the whole `FeedSeen` map for expired entries on every insert, under `d.mu`. Gate: a periodic sweep outside the lock or time buckets, with API latency measured during a large poll.
 
 ## Gextto daemon
 
@@ -39,11 +38,6 @@ still be true after the item lands does not belong here.
 ## Interface
 
 - **TUI selection, stream limits and maintenance errors**: a refresh can move the selection after an HTTP/eD2k row is inserted, SSE lines and events have no byte limit, and a backup error is cleared by the next successful maintenance call. Gate: keep the selection by identity, cap lines and events, record errors per endpoint.
-
-## Release and scripts
-
-- **Continuous release replaced before verification**: `publish-github-release.sh` drafts the live release and clobbers its assets before downloading and checking them, so a failure leaves the channel unpublished or mixed. Gate: build and verify a separate draft, then promote it, with a mock `gh` failing half way.
-- **Unquoted systemd units**: the user installer, the tmp cleaner and the packaging scripts write `ExecStart` and `Environment` verbatim, so a path with spaces or `%` breaks the unit. Gate: systemd escaping checked with `systemd-analyze verify`, and binary backup before replacement.
 
 ## Proposals
 

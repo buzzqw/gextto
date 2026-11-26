@@ -23,7 +23,12 @@ const (
 	feedIntervalKey     = "feed-interval-secs"
 	defaultFeedInterval = 180 * time.Minute
 	feedSeenRetention   = 30 * 24 * time.Hour
-	feedRequestTimeout  = 30 * time.Second
+	// feedSeenPruneEvery is how often the whole FeedSeen map is scanned for
+	// expired entries. Retention is a month, so a scan every ten minutes is
+	// plenty and keeps a poll that adds many items from rescanning the map for
+	// each one, under the daemon lock.
+	feedSeenPruneEvery = 10 * time.Minute
+	feedRequestTimeout = 30 * time.Second
 	// indexerSearchTimeout gives a Torznab indexer more room than a plain RSS
 	// fetch: MirCrew, for instance, may search its forum before answering.
 	indexerSearchTimeout = 45 * time.Second
@@ -826,10 +831,17 @@ func (d *Daemon) markFeedSeen(feed, guid string) {
 	}
 	now := time.Now()
 	d.state.FeedSeen[feedSeenKey(feed, guid)] = now.Unix()
-	for key, at := range d.state.FeedSeen {
-		if now.Sub(time.Unix(at, 0)) > feedSeenRetention {
-			delete(d.state.FeedSeen, key)
+	// A poll can add hundreds of items and each insert used to walk the whole
+	// map under d.mu. Expired entries are dropped at most once per
+	// feedSeenPruneEvery: retention is a month, so a few extra minutes do not
+	// matter, while the API latency no longer depends on the map size per item.
+	if d.feedSeenPruned.IsZero() || now.Sub(d.feedSeenPruned) >= feedSeenPruneEvery {
+		for key, at := range d.state.FeedSeen {
+			if now.Sub(time.Unix(at, 0)) > feedSeenRetention {
+				delete(d.state.FeedSeen, key)
+			}
 		}
+		d.feedSeenPruned = now
 	}
 	// Only mark dirty: pollFeeds does one atomic save at the end of the cycle,
 	// instead of rewriting state.json for every item added.

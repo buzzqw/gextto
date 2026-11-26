@@ -43,6 +43,44 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
+# systemd_path escapes a setting whose value is a single path (WorkingDirectory=).
+# systemd expands %-specifiers there but does not unquote the value, so spaces
+# stay as they are and only % is doubled.
+systemd_path() {
+  local value="$1"
+  printf '%s' "${value//%/%%}"
+}
+
+# systemd_value quotes an Environment= value: the setting is split on
+# whitespace, so a path with a space must be quoted. systemd's parser also
+# expands %-specifiers and reads C escapes inside double quotes.
+systemd_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//%/%%}"
+  printf '"%s"' "$value"
+}
+
+# systemd_exec quotes one ExecStart argument, where systemd also expands
+# $variables: a literal dollar is written as $$.
+systemd_exec() {
+  local value
+  value="$(systemd_value "$1")"
+  value="${value//\$/\$\$}"
+  printf '%s' "$value"
+}
+
+# verify_unit rejects a generated unit before it is enabled. A path that breaks
+# the unit syntax must stop the install here, not leave a service that cannot
+# start; a host without systemd-analyze skips the check.
+verify_unit() {
+  local unit="$1"
+  command -v systemd-analyze >/dev/null 2>&1 || return 0
+  systemd-analyze verify "$unit" >/dev/null 2>&1 ||
+    die "the generated systemd unit is not valid: $unit (run: systemd-analyze verify $unit)"
+}
+
 validate_data_purge_target() {
   local resolved
   [[ -n "$DATA_DIR" ]] || die "data directory must not be empty"
@@ -131,8 +169,17 @@ build_binary() {
     log "[dry-run] build binary at $BINARY"
     return 0
   fi
+  # Keep the binary the service is running: a new build that does not start is
+  # rolled back together with the unit, instead of leaving the installation on
+  # a program that cannot boot.
+  if [[ -x "$BINARY" ]]; then
+    cp -a "$BINARY" "$BINARY.prev"
+  fi
   log "building $BINARY"
-  ( cd "$ROOT" && GEXTTO_BINARY="$BINARY" make build )
+  if ! ( cd "$ROOT" && GEXTTO_BINARY="$BINARY" make build ); then
+    [[ ! -f "$BINARY.prev" ]] || cp -a "$BINARY.prev" "$BINARY"
+    die "the build failed; the previous binary was restored"
+  fi
 }
 
 write_unit() {
@@ -145,14 +192,14 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=$ROOT
-ExecStart=$BINARY
-Environment=GEXTTO_DATA_DIR=$DATA_DIR
-Environment=GEXTTO_LISTEN=$LISTEN
-Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:$ENGINE_PORT
-Environment=GEXTTO_ACTIVE=$ACTIVE
-Environment=GEXTTO_DRY_RUN=$SERVICE_DRY_RUN
-Environment=GEXTTO_LOG=$LOG
+WorkingDirectory=$(systemd_path "$ROOT")
+ExecStart=$(systemd_exec "$BINARY")
+Environment=GEXTTO_DATA_DIR=$(systemd_value "$DATA_DIR")
+Environment=GEXTTO_LISTEN=$(systemd_value "$LISTEN")
+Environment=GEXTTO_ENGINE_LISTEN=$(systemd_value "127.0.0.1:$ENGINE_PORT")
+Environment=GEXTTO_ACTIVE=$(systemd_value "$ACTIVE")
+Environment=GEXTTO_DRY_RUN=$(systemd_value "$SERVICE_DRY_RUN")
+Environment=GEXTTO_LOG=$(systemd_value "$LOG")
 # Return freed heap to the OS at once (MADV_DONTNEED): with the default
 # MADV_FREE the pages stay resident until the kernel needs them, so an idle
 # daemon keeps showing the footprint of its last search.
@@ -175,10 +222,15 @@ UNIT
     cp -a "$UNIT" "$UNIT.prev"
   fi
   if [[ "$PLAN" == "1" ]]; then
-    printf '   [dry-run] write %s\n' "$UNIT" >&2
+    if [[ "${GEXTTO_PRINT_UNIT:-0}" == "1" ]]; then
+      printf '%s\n' "$unit"
+    else
+      printf '   [dry-run] write %s\n' "$UNIT" >&2
+    fi
     return 0
   fi
   printf '%s\n' "$unit" > "$UNIT"
+  verify_unit "$UNIT"
 }
 
 # activate restarts the service, waits for it to become active and restores the
@@ -197,13 +249,17 @@ activate() {
   while (( waited < HEALTH_TIMEOUT )); do
     if systemctl --user is-active --quiet "$SERVICE_NAME"; then
       log "gextto is running"
-      rm -f "$UNIT.prev"
+      rm -f "$UNIT.prev" "$BINARY.prev"
       return 0
     fi
     sleep 1
     waited=$((waited + 1))
   done
 
+  if [[ -f "$BINARY.prev" ]]; then
+    warn "gextto did not start; restoring the previous binary"
+    cp -a "$BINARY.prev" "$BINARY"
+  fi
   if [[ -f "$UNIT.prev" ]]; then
     warn "gextto did not start; restoring the previous unit"
     cp -a "$UNIT.prev" "$UNIT"

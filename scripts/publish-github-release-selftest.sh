@@ -50,6 +50,9 @@ if [[ "${1:-}" == "release" ]]; then
     view)
       [[ "${MOCK_VIEW:-ok}" == "ok" ]] || exit 1
       ;;
+    upload)
+      [[ "${MOCK_FAIL_UPLOAD:-0}" == "1" ]] && exit 1
+      ;;
     download)
       dir=""
       while [[ $# -gt 0 ]]; do
@@ -60,7 +63,11 @@ if [[ "${1:-}" == "release" ]]; then
   esac
 fi
 if [[ "${1:-}" == "api" && " $* " == *" --jq "* ]]; then
-  printf '%s\n' "$PUBLISH_COMMIT"
+  if [[ " $* " == *"/releases/tags/"* ]]; then
+    printf '123\n'
+  else
+    printf '%s\n' "$PUBLISH_COMMIT"
+  fi
 fi
 exit 0
 MOCK
@@ -74,8 +81,6 @@ chmod +x "$MOCK_BIN/sleep"
 COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
 export MOCK_LOG="$TMP/gh.log" MOCK_SLEEP_LOG="$TMP/sleep.log" FIXTURE_DIST="$DIST"
 export PUBLISH_COMMIT="$COMMIT"
-: > "$MOCK_LOG"
-: > "$MOCK_SLEEP_LOG"
 
 publish() {
   PATH="$MOCK_BIN:$PATH" bash "$ROOT/scripts/publish-github-release.sh" \
@@ -83,11 +88,6 @@ publish() {
     --dist "$DIST" --repo owner/repo --commit "$COMMIT"
 }
 
-# Existing rolling release: it is drafted, never recreated, and published.
-publish > "$TMP/out" 2>&1
-grep -qF 'release view' "$MOCK_LOG" || { echo "release view was never called" >&2; exit 1; }
-if grep -qF 'release create' "$MOCK_LOG"; then echo "existing release was recreated" >&2; exit 1; fi
-grep -qF 'published continuous' "$TMP/out" || { echo "publication did not complete" >&2; exit 1; }
 check_no_retry() {
   if [[ -s "$MOCK_SLEEP_LOG" ]]; then
     echo "a gh call was retried although it succeeded" >&2
@@ -98,13 +98,39 @@ check_no_retry() {
     exit 1
   fi
 }
+
+# Existing rolling release: the new build is uploaded and verified on a
+# candidate draft first, then the old release is replaced.
+: > "$MOCK_LOG"
+: > "$MOCK_SLEEP_LOG"
+publish > "$TMP/out" 2>&1
+grep -qF 'release view continuous' "$MOCK_LOG" || { echo "the live release was never inspected" >&2; exit 1; }
+grep -qF 'release create continuous-candidate-' "$MOCK_LOG" || { echo "no candidate draft was created" >&2; exit 1; }
+grep -qE '^release delete continuous --repo' "$MOCK_LOG" || { echo "the old release was not removed at promotion" >&2; exit 1; }
+grep -qF 'release edit continuous --repo owner/repo --draft=false' "$MOCK_LOG" || { echo "the candidate was not published" >&2; exit 1; }
+grep -qF 'api -X PATCH repos/owner/repo/releases/123 -f tag_name=continuous' "$MOCK_LOG" || { echo "the candidate did not take the live tag" >&2; exit 1; }
+grep -qF 'published continuous' "$TMP/out" || { echo "publication did not complete" >&2; exit 1; }
 check_no_retry
 
-# Missing release: the probe legitimately fails, then a draft is created.
+# Missing release: the probe legitimately fails, then a candidate is created
+# and promoted without deleting anything.
 : > "$MOCK_LOG"
 : > "$MOCK_SLEEP_LOG"
 MOCK_VIEW=missing publish > "$TMP/out" 2>&1
-grep -qF 'release create' "$MOCK_LOG" || { echo "missing release was not created" >&2; exit 1; }
+grep -qF 'release create continuous-candidate-' "$MOCK_LOG" || { echo "no candidate draft was created" >&2; exit 1; }
+if grep -qE '^release delete continuous --repo' "$MOCK_LOG"; then echo "a missing release was deleted" >&2; exit 1; fi
 grep -qF 'published continuous' "$TMP/out" || { echo "publication did not complete" >&2; exit 1; }
+
+# A failure while uploading must leave the live release untouched: the
+# candidate is removed and nothing public is deleted, renamed or edited.
+: > "$MOCK_LOG"
+: > "$MOCK_SLEEP_LOG"
+if MOCK_FAIL_UPLOAD=1 publish > "$TMP/out" 2>&1; then
+  echo "an upload failure was reported as success" >&2
+  exit 1
+fi
+if grep -qE '^release delete continuous --repo' "$MOCK_LOG"; then echo "the live release was deleted after a failed upload" >&2; exit 1; fi
+if grep -qF 'release edit continuous --repo owner/repo --draft=false' "$MOCK_LOG"; then echo "a failed upload was published" >&2; exit 1; fi
+grep -qE '^release delete continuous-candidate-.*--cleanup-tag' "$MOCK_LOG" || { echo "the failed candidate was not cleaned up" >&2; exit 1; }
 
 echo "publish flow checks passed"

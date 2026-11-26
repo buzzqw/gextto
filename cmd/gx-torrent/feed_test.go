@@ -773,3 +773,47 @@ func TestFeedTorrentLinksStayOffPrivateHostsTheyWereNotGiven(t *testing.T) {
 		t.Fatalf("the configured host received %d requests, want 1", hits.Load())
 	}
 }
+
+// TestMarkFeedSeenPrunesAtMostEveryInterval: the whole-map scan that drops
+// expired entries is amortised. A poll that adds hundreds of items used to walk
+// the map for each one, under the daemon lock; now the map is scanned once per
+// feedSeenPruneEvery, and retention (a month) makes the few extra minutes
+// irrelevant.
+func TestMarkFeedSeenPrunesAtMostEveryInterval(t *testing.T) {
+	d := newTestDaemon(t)
+	expired := time.Now().Add(-feedSeenRetention - time.Hour).Unix()
+	d.state.FeedSeen = map[string]int64{"feed\x00old": expired}
+
+	// The first insert primes the map and prunes the expired entry.
+	d.markFeedSeen("feed", "first")
+	d.mu.Lock()
+	_, present := d.state.FeedSeen["feed\x00old"]
+	d.mu.Unlock()
+	if present {
+		t.Fatal("the expired entry survived the first scan")
+	}
+
+	// An entry that expires between two scans waits for the next one.
+	d.mu.Lock()
+	d.state.FeedSeen["feed\x00later"] = expired
+	d.mu.Unlock()
+	d.markFeedSeen("feed", "second")
+	d.mu.Lock()
+	_, present = d.state.FeedSeen["feed\x00later"]
+	d.mu.Unlock()
+	if !present {
+		t.Fatal("the map was rescanned before feedSeenPruneEvery had passed")
+	}
+
+	// Past the interval the next insert drops it.
+	d.mu.Lock()
+	d.feedSeenPruned = time.Now().Add(-feedSeenPruneEvery - time.Second)
+	d.mu.Unlock()
+	d.markFeedSeen("feed", "third")
+	d.mu.Lock()
+	_, present = d.state.FeedSeen["feed\x00later"]
+	d.mu.Unlock()
+	if present {
+		t.Fatal("the expired entry survived the interval")
+	}
+}

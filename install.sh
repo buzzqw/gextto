@@ -83,6 +83,44 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
+# systemd_path escapes a setting whose value is a single path (WorkingDirectory=,
+# PathExists=, StandardOutput=append:). systemd expands %-specifiers there but
+# does not unquote the value, so spaces stay as they are and only % is doubled.
+systemd_path() {
+  local value="$1"
+  printf '%s' "${value//%/%%}"
+}
+
+# systemd_value quotes an Environment= value: the setting is split on
+# whitespace, so a path with a space must be quoted. systemd's parser also
+# expands %-specifiers and reads C escapes inside double quotes.
+systemd_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//%/%%}"
+  printf '"%s"' "$value"
+}
+
+# systemd_exec quotes one ExecStart argument, where systemd also expands
+# $variables: a literal dollar is written as $$.
+systemd_exec() {
+  local value
+  value="$(systemd_value "$1")"
+  value="${value//\$/\$\$}"
+  printf '%s' "$value"
+}
+
+# verify_unit rejects a generated unit before it is enabled. A path that breaks
+# the unit syntax must stop the install here, not leave a service that cannot
+# start; a host without systemd-analyze skips the check.
+verify_unit() {
+  local unit="$1"
+  command -v systemd-analyze >/dev/null 2>&1 || return 0
+  systemd-analyze verify "$unit" >/dev/null 2>&1 ||
+    die "the generated systemd unit is not valid: $unit (run: systemd-analyze verify $unit)"
+}
+
 # Refuse directory targets that would make an install/chown/rm operation
 # affect a system root, the checkout, or the user's whole home directory.
 validate_directory_target() {
@@ -672,16 +710,16 @@ Type=simple
 User=$SERVICE_USER
 Group=$SERVICE_GROUP
 EnvironmentFile=-/etc/gextto/gextto.env
-Environment=GEXTTO_DATA_DIR=$DATA_DIR
-Environment=GEXTTO_LISTEN=$LISTEN
-Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:$ENGINE_PORT
+Environment=GEXTTO_DATA_DIR=$(systemd_value "$DATA_DIR")
+Environment=GEXTTO_LISTEN=$(systemd_value "$LISTEN")
+Environment=GEXTTO_ENGINE_LISTEN=$(systemd_value "127.0.0.1:$ENGINE_PORT")
 Environment=GEXTTO_LOG=info
 # Return freed heap to the OS at once (MADV_DONTNEED): with the default
 # MADV_FREE the pages stay resident until the kernel needs them, so an idle
 # daemon keeps showing the footprint of its last search.
 Environment=GODEBUG=madvdontneed=1
-WorkingDirectory=$DATA_DIR
-ExecStart=$INSTALL_DIR/gexttod
+WorkingDirectory=$(systemd_path "$DATA_DIR")
+ExecStart=$(systemd_exec "$INSTALL_DIR/gexttod")
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
@@ -695,11 +733,16 @@ WantedBy=multi-user.target
 UNIT
 )"
   if [[ "$DRY_RUN" == "1" ]]; then
-    printf '   [dry-run] write %s\n' "$UNIT_PATH" >&2
+    if [[ "${GEXTTO_PRINT_UNIT:-0}" == "1" ]]; then
+      printf '%s\n' "$unit"
+    else
+      printf '   [dry-run] write %s\n' "$UNIT_PATH" >&2
+    fi
     return 0
   fi
   install -d /etc/systemd/system
   printf '%s\n' "$unit" > "$UNIT_PATH"
+  verify_unit "$UNIT_PATH"
 }
 
 # write_update_units installs the root path unit that serves the "Update"
@@ -714,7 +757,7 @@ write_update_units() {
 Description=Watch for Gextto update requests from the web UI
 
 [Path]
-PathExists=$request
+PathExists=$(systemd_path "$request")
 Unit=gextto-update.service
 
 [Install]
@@ -730,20 +773,26 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 # Remove the request first: a failed update must not loop.
-ExecStartPre=/bin/rm -f $request
-ExecStart=$INSTALL_DIR/gexttod --update
-StandardOutput=append:$UPDATE_LOG
-StandardError=append:$UPDATE_LOG
+ExecStartPre=/bin/rm -f $(systemd_exec "$request")
+ExecStart=$(systemd_exec "$INSTALL_DIR/gexttod") --update
+StandardOutput=append:$(systemd_path "$UPDATE_LOG")
+StandardError=append:$(systemd_path "$UPDATE_LOG")
 # The restart waits for media copies to the NAS to finish.
 TimeoutStartSec=infinity
 UNIT
 )"
   if [[ "$DRY_RUN" == "1" ]]; then
-    printf '   [dry-run] write %s and %s\n' "$UPDATE_PATH_UNIT" "$UPDATE_SERVICE_UNIT" >&2
+    if [[ "${GEXTTO_PRINT_UNIT:-0}" == "1" ]]; then
+      printf '%s\n' "$path_unit" "$service_unit"
+    else
+      printf '   [dry-run] write %s and %s\n' "$UPDATE_PATH_UNIT" "$UPDATE_SERVICE_UNIT" >&2
+    fi
     return 0
   fi
   printf '%s\n' "$path_unit" > "$UPDATE_PATH_UNIT"
   printf '%s\n' "$service_unit" > "$UPDATE_SERVICE_UNIT"
+  verify_unit "$UPDATE_PATH_UNIT"
+  verify_unit "$UPDATE_SERVICE_UNIT"
   # Readable by the service, so the UI can show how the last update went.
   touch "$UPDATE_LOG"
   chmod 0644 "$UPDATE_LOG"

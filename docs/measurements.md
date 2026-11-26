@@ -444,6 +444,7 @@ than the code.
 | IP filter load, 172,000 rules | 30–36 ms, 6.6 MB | at start |
 | Blocked-IP lookup | 20 ns | every incoming address |
 | Archive insert, 1,000 releases | 43–44 ms | per feed batch |
+| Feed entry insert, 1,000 / 10,000 / 50,000 seen items (`BenchmarkMarkFeedSeenAmortised`) | 0.19–0.34 µs | the expiry scan runs once per 10 minutes, not per item, under the daemon lock |
 | Archive search, 100,000 releases | 7.9–8.1 ms | standalone search |
 | Re-score of 2,000 torrents | 55–57 ms | one transaction per 500 rows |
 | Series match, 500 series | 122–138 µs | one release against the list |

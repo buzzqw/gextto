@@ -522,10 +522,14 @@ Stable and continuous releases share the blocking quality gates in
 `.github/workflows/release-gates.yml`: unit tests, engine tests, Playwright UI,
 race detector, fuzz smoke pass and CodeQL. `scripts/verify-release-assets.sh`
 then checks the complete six-package set, its local SHA-256 checksums and the
-expected archive contents before `scripts/publish-github-release.sh` uploads
-everything, verifies the downloaded copies and only then moves the rolling tag
-and publishes `release.json`. CI (`ci.yml`) reuses the same gates for UI and
-race, leaving fuzz and CodeQL to their dedicated workflows.
+expected archive contents. `scripts/publish-github-release.sh` uploads them to a
+**candidate draft with its own temporary tag**, downloads them again and
+verifies the copies there; only when the candidate is complete does it move the
+rolling tag, delete the previous release, give the candidate the live tag and
+publish it with `release.json`. A failure before that point leaves the live
+release untouched; a failure after the old release is gone keeps the verified
+draft for a retry. CI (`ci.yml`) reuses the same gates for UI and race, leaving
+fuzz and CodeQL to their dedicated workflows.
 
 A workflow that calls `release-gates.yml` must grant, **on the calling job**, every
 permission the reusable workflow declares — `security-events: write` included for

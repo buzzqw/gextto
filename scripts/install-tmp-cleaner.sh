@@ -18,14 +18,36 @@ SCRIPT="$ROOT/scripts/tmp-smart-clean.sh"
 
 UNINSTALL=0
 RUN_NOW=0
+DRY_RUN=0
 for arg in "$@"; do
   case "$arg" in
     --uninstall) UNINSTALL=1 ;;
     --run-now) RUN_NOW=1 ;;
+    --dry-run) DRY_RUN=1 ;;
     -h | --help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+
+# systemd_value quotes a setting whose value may contain a space (Documentation=,
+# ExecStart=): systemd splits those on whitespace and expands %-specifiers, so
+# quotes and backslashes are escaped for its parser.
+systemd_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//%/%%}"
+  printf '"%s"' "$value"
+}
+
+# systemd_exec quotes one ExecStart argument, where systemd also expands
+# $variables: a literal dollar is written as $$.
+systemd_exec() {
+  local value
+  value="$(systemd_value "$1")"
+  value="${value//\$/\$\$}"
+  printf '%s' "$value"
+}
 
 if [[ "$UNINSTALL" == 1 ]]; then
   systemctl --user disable --now tmp-clean.timer 2>/dev/null || true
@@ -38,21 +60,21 @@ fi
 [[ -x "$SCRIPT" ]] || { echo "missing $SCRIPT" >&2; exit 1; }
 mkdir -p "$UNIT_DIR"
 
-cat > "$SERVICE" <<EOF
+service_unit="$(cat <<EOF
 [Unit]
 Description=Clean /tmp of the current user's stale files (age, in-use, junk)
-Documentation=file:$SCRIPT
+Documentation=$(systemd_value "file:$SCRIPT")
 
 [Service]
 Type=oneshot
-ExecStart=$SCRIPT --verbose
+ExecStart=$(systemd_exec "$SCRIPT") --verbose
 # The log is short: keep it in the journal, and do not fail the unit for a file
 # that vanished while the cleaner was running.
 Nice=10
 IOSchedulingClass=idle
 EOF
-
-cat > "$TIMER" <<'EOF'
+)"
+timer_unit="$(cat <<'EOF'
 [Unit]
 Description=Run the smart /tmp cleaner daily
 
@@ -66,6 +88,13 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
+)"
+if [[ "$DRY_RUN" == 1 ]]; then
+  printf '%s\n' "$service_unit" "$timer_unit"
+  exit 0
+fi
+printf '%s\n' "$service_unit" > "$SERVICE"
+printf '%s\n' "$timer_unit" > "$TIMER"
 
 systemctl --user daemon-reload
 systemctl --user enable --now tmp-clean.timer
