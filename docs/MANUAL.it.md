@@ -594,7 +594,13 @@ scelta.
   ricerca passa a un'altra versione. Un pacchetto in volumi RAR o 7z resta
   accettato (il video è dentro e viene estratto prima dell'importazione), una
   puntata con sottotitoli, `.nfo` o `.url` pure, e un torrent che avvii tu a
-  mano non viene mai toccato.
+  mano non viene mai toccato. Con **Contenuti non sicuri** puoi scegliere cosa
+  succede: *Blocca e rimuovi* è il comportamento descritto, *Quarantena i file
+  sospetti* sposta solo i file pericolosi e lascia il video buono perché venga
+  archiviato, *Solo avviso* segnala senza toccare nulla. Senza un video valido
+  la quarantena non è possibile e Gextto blocca come prima. Se il file indicato
+  dal completamento non supera il controllo ma accanto c'è un video valido,
+  Gextto archivia quest'ultimo e mette in quarantena solo quello cattivo.
 - Un pack annunciato **in corso** (per esempio «4 su 8» puntate) può contenere
   solo le puntate già uscite: quelle che ci sono dentro entrano in libreria e le
   altre restano mancanti, da cercare più avanti. Gextto non scarta il download
@@ -2451,6 +2457,12 @@ salvata** finché non li salvi.
 | Blacklist (una parola per riga) | Parole vietate, una per riga: le release che le contengono vengono scartate. |
 | Pagine feed da leggere | Quante pagine di elenco leggere per ogni feed (3 è un buon compromesso). |
 | Disabilita i feed dopo giorni di errori | Dopo quanti giorni senza un successo il feed viene disabilitato automaticamente con un `#` davanti alla riga. Scatta solo se un altro feed ha funzionato nello stesso giorno; `0` disattiva la regola. |
+
+**Sicurezza**
+
+| Impostazione | Cosa fa |
+|---|---|
+| Contenuti non sicuri | Cosa succede se un download contiene un programma o un file che non dovrebbe esserci: *Blocca e rimuovi* (predefinito) toglie il torrent e i file parziali; *Quarantena i file sospetti* sposta solo i file pericolosi e conserva il video buono; *Solo avviso* non tocca nulla. |
 
 **Editor**
 

@@ -6163,3 +6163,10 @@ eng:
   "Conferma il rischio di hit-and-run per seminare questa copia.": "Confirm the hit-and-run risk before seeding this copy."
   "Impossibile seminare questa copia:": "Could not seed this copy:"
   "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "Seeding this copy can end before the configured targets; check the tracker rules."
+
+  # ingress content policy
+  "Contenuti non sicuri": "Unsafe content"
+  "Blocca e rimuovi": "Block and remove"
+  "Quarantena i file sospetti": "Quarantine suspicious files"
+  "Solo avviso": "Report only"
+  "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "What happens when a download contains a program or a file that should not be there. Block removes the torrent and its partial files; Quarantine moves only the suspicious files and keeps the good video; Report only changes nothing. With no valid video, quarantine is not possible and the torrent is blocked as before."

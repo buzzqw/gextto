@@ -265,6 +265,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "hardlink_seeding", Label: "Hardlink invece della copia durante il seed", Tab: "seeding", Group: "A download completato"},
 	{Key: "pack_inspection", Label: "Ispeziona i pack in download e scarta quelli inutili", Tab: "seeding", Group: "Controllo dei pack"},
 	{Key: "pack_inspection_prioritize", Label: "Nei pack utili scarica solo i file che servono", Tab: "seeding", Group: "Controllo dei pack"},
+	{Key: "ingress_content_policy", Label: "Contenuti non sicuri", Tab: "sources", Group: "Sicurezza"},
 	{Key: "torrent_stall_after_min", Label: "Considera bloccato dopo", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "torrent_stall_retry_min", Label: "Riprova i torrent bloccati ogni", Tab: "seeding", Group: "Torrent bloccati"},
 	{Key: "torrent_stall_giveup_min", Label: "Rimuovi i torrent bloccati dopo", Tab: "seeding", Group: "Torrent bloccati"},

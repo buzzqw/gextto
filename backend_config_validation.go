@@ -209,6 +209,13 @@ func validateSettingValue(key, value string, cfg *Config) error {
 			return fmt.Errorf("%s must be it, en, de, fr, es or pl", key)
 		}
 	}
+	if key == settingIngressContentPolicy {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "", ingressPolicyBlock, ingressPolicyQuarantine, ingressPolicyOff:
+		default:
+			return fmt.Errorf("%s must be block, quarantine or off", key)
+		}
+	}
 	if key == audioCleanupPolicySetting {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case "", audioCleanupPolicyAll, audioCleanupPolicyBest, audioCleanupPolicyFirst:

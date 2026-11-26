@@ -37,6 +37,25 @@ import (
 // the Blocklist page, where every reason is shown by its code.
 const unsafePayloadBlockReason = "unsafe_payload"
 
+// ingressContentPolicy is what Gextto does with a payload that carries a
+// program where a video should be. "block" is the safe default; "quarantine"
+// keeps a good video and moves only the suspicious files; "off" only reports.
+const (
+	ingressPolicyBlock      = "block"
+	ingressPolicyQuarantine = "quarantine"
+	ingressPolicyOff        = "off"
+)
+
+func ingressContentPolicy(cfg *Config) string {
+	policy := strings.ToLower(strings.TrimSpace(settingsOr(cfg, settingIngressContentPolicy, ingressPolicyBlock)))
+	switch policy {
+	case ingressPolicyBlock, ingressPolicyQuarantine, ingressPolicyOff:
+		return policy
+	default:
+		return ingressPolicyBlock
+	}
+}
+
 // unsafePayloadBlockPeriod is how long a refused payload stays out of the
 // searches. A file list does not change, so the release would be refused again
 // at every cycle and repeat the same line in the log; but an indexer can
@@ -114,6 +133,16 @@ func isSampleFile(name string) bool {
 // another payload (a comic, an archive of images) is not a video and has its
 // own import.
 func unsafePayloadReason(names []string, kind string) string {
+	return unsafePayloadReasonForPolicy(names, kind, ingressPolicyBlock)
+}
+
+// unsafePayloadReasonForPolicy applies the configured policy. With the
+// reporting policy off a dangerous list is still visible in the log by the
+// caller, but nothing is refused; this is an explicit opt-out, not a silence.
+func unsafePayloadReasonForPolicy(names []string, kind, policy string) string {
+	if policy == ingressPolicyOff {
+		return ""
+	}
 	for _, name := range names {
 		if unsafePayloadExtensions[fileExtension(name)] {
 			return fmt.Sprintf("its payload carries a program or a script (%s)", path.Base(name))

@@ -6774,3 +6774,10 @@ spa:
   "Conferma il rischio di hit-and-run per seminare questa copia.": "Confirma el riesgo de hit-and-run antes de sembrar esta copia."
   "Impossibile seminare questa copia:": "No se pudo sembrar esta copia:"
   "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "El seeding de esta copia puede terminar antes de los objetivos configurados; revisa las reglas del tracker."
+
+  # ingress content policy
+  "Contenuti non sicuri": "Contenido no seguro"
+  "Blocca e rimuovi": "Bloquear y eliminar"
+  "Quarantena i file sospetti": "Cuarentena de archivos sospechosos"
+  "Solo avviso": "Solo avisar"
+  "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "Qué ocurre cuando una descarga contiene un programa o un archivo que no debería estar. Bloquear elimina el torrent y los archivos parciales; Cuarentena mueve solo los archivos sospechosos y conserva el vídeo bueno; Solo avisar no cambia nada. Sin un vídeo válido, la cuarentena no es posible y el torrent se bloquea como antes."

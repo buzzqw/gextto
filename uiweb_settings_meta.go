@@ -136,6 +136,11 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"torrent_cache_expiry":                {Unit: "secondi"},
 
 	// Seed e completamento
+	"ingress_content_policy": {Kind: "select", Options: []uiFormOption{
+		{Value: ingressPolicyBlock, Label: "Blocca e rimuovi"},
+		{Value: ingressPolicyQuarantine, Label: "Quarantena i file sospetti"},
+		{Value: ingressPolicyOff, Label: "Solo avviso"},
+	}},
 	"torrent_active_metadata":           {Zero: "0 = usa gli slot di download"},
 	"torrent_seed_ratio":                {Zero: "0 = infinito"},
 	"torrent_seed_time_days":            {Unit: "giorni", Zero: "0 = usa il limite in minuti"},

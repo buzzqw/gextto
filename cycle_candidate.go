@@ -353,7 +353,7 @@ func (r *candidateRun) unsafePayload() bool {
 			"target", releaseTarget(&r.release), "error", err)
 		return false
 	}
-	why := unsafePayloadReason(names, r.release.Kind)
+	why := unsafePayloadReasonForPolicy(names, r.release.Kind, ingressContentPolicy(r.p.cfg))
 	if why == "" {
 		return false
 	}

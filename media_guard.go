@@ -119,6 +119,37 @@ func resolveMovieCompletedFile(path string) (string, error) {
 	return mainFiles[0], nil
 }
 
+// validCompletedVideoBeside finds a usable video when the path named by the
+// completion event is bad. A mixed payload can put a disguised executable next
+// to a real video, or point the event at the wrong file: quarantining the bad
+// one must not stop the good one from reaching the library. The original file
+// is left for the caller to quarantine.
+func validCompletedVideoBeside(path string) (string, error) {
+	firstErr := validateCompletedFile(path)
+	if firstErr == nil {
+		return path, nil
+	}
+	parent := filepath.Dir(path)
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		parent = path
+	}
+	candidates, err := VideoFiles(parent)
+	if err != nil {
+		return "", firstErr
+	}
+	wanted, _ := filepath.Abs(path)
+	for _, candidate := range candidates {
+		absolute, _ := filepath.Abs(candidate)
+		if strings.EqualFold(absolute, wanted) {
+			continue
+		}
+		if validateCompletedFile(candidate) == nil {
+			return candidate, nil
+		}
+	}
+	return "", firstErr
+}
+
 func allZero(data []byte) bool {
 	for _, value := range data {
 		if value != 0 {

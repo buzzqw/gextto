@@ -88,13 +88,84 @@ func InspectActiveContent(cfg *Config, torrents TorrentEngine, db *Database, not
 		for _, file := range files {
 			names = append(names, file.Path)
 		}
-		why := unsafePayloadReason(names, release.Kind)
+		policy := ingressContentPolicy(cfg)
+		why := unsafePayloadReasonForPolicy(names, release.Kind, policy)
 		if why == "" {
+			if policy == ingressPolicyOff && unsafePayloadReason(names, release.Kind) != "" {
+				logging.Warn(fmt.Sprintf("⚠️ «%s» carries an unsafe payload, but Gextto is set to only report it: %s", release.Title, unsafePayloadReason(names, release.Kind)))
+			}
 			checked[torrent.Hash] = settled
+			continue
+		}
+		if policy == ingressPolicyQuarantine && quarantineUnsafeFiles(cfg, torrents, torrent, files) {
+			keepUnsafePayloadCopies(db, notifier, torrent, release, why)
+			delete(checked, torrent.Hash)
 			continue
 		}
 		discardUnsafePayload(db, torrents, notifier, torrent, release, why)
 		delete(checked, torrent.Hash)
+	}
+}
+
+// quarantineUnsafeFiles moves only the files that cannot belong to a video
+// release, leaving the good video where the import can find it. It refuses to
+// do so when no valid video remains: in that case there is nothing to save and
+// the full block is the safe answer.
+func quarantineUnsafeFiles(cfg *Config, torrents TorrentEngine, torrent models.TorrentView, files []models.FileView) bool {
+	valid, suspicious := 0, []string{}
+	for _, file := range files {
+		if isVideoExtension(file.Path) && !isSampleFile(file.Path) {
+			valid++
+			continue
+		}
+		if unsafePayloadExtensions[fileExtension(file.Path)] {
+			suspicious = append(suspicious, file.Path)
+		}
+	}
+	if valid == 0 || len(suspicious) == 0 {
+		return false
+	}
+	moved := 0
+	for _, path := range suspicious {
+		if quarantineCorruptFile(path, cfg) != "" {
+			moved++
+		}
+	}
+	if moved == 0 {
+		return false
+	}
+	if _, err := torrents.Remove(torrent.Hash, false); err != nil {
+		logging.Warn("could not detach a torrent whose suspicious files were quarantined",
+			"hash", torrent.Hash, "error", err.Error())
+	}
+	return true
+}
+
+// keepUnsafePayloadCopies records the refusal and says what was kept: the
+// video stays for the import, the suspicious files are out of the way, and the
+// torrent is gone from the download list.
+func keepUnsafePayloadCopies(db *Database, notifier *Notifier, torrent models.TorrentView, release models.Release, why string) {
+	refuseUnsafePayload(db, &release, time.Now())
+	logging.Info(fmt.Sprintf("🗑️ «%s»: %s. The suspicious files were moved out of the way, the video was kept for the library and the torrent left the download list",
+		release.Title, why), "hash", torrent.Hash)
+	if notifier == nil {
+		return
+	}
+	data := map[string]any{
+		"hash":   torrent.Hash,
+		"name":   torrent.Name,
+		"title":  release.Title,
+		"kind":   release.Kind,
+		"reason": why,
+	}
+	if release.Series != nil {
+		data["series"] = *release.Series
+	}
+	if release.Season != nil {
+		data["season"] = *release.Season
+	}
+	if err := notifier.NotifyEvent("download_discarded", data); err != nil {
+		logging.Warn("discard notification failed", "hash", torrent.Hash, "error", err)
 	}
 }
 

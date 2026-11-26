@@ -589,7 +589,13 @@ choice.
   days and the search moves on to another version. A pack in RAR or 7z volumes
   is still accepted (the video is inside and is extracted before the import),
   and so is an episode with subtitles, `.nfo` or `.url`; a torrent you start by
-  hand is never touched.
+  hand is never touched. **Unsafe content** chooses what happens: *Block and
+  remove* is the behaviour above, *Quarantine suspicious files* moves only the
+  dangerous files and leaves the good video to be archived, *Report only* says
+  so without changing anything. With no valid video, quarantine is not possible
+  and Gextto blocks as before. When the file named by the completion event fails
+  validation but a valid video sits beside it, Gextto archives that one and
+  quarantines only the bad file.
 - A pack announced as **in progress** (for example «4 of 8» episodes) can hold
   only the episodes already aired: the ones inside it enter the library and the
   others stay missing, to be searched later. Gextto does not throw the download
@@ -2416,6 +2422,12 @@ them.
 | Blacklist (one word per line) | Forbidden words, one per line: releases containing them are discarded. |
 | Feed pages to read | How many listing pages to read per feed (3 is a good compromise). |
 | Disable feeds after days of errors | After how many days without a success the feed is disabled automatically with a `#` in front of its line. It only fires when another feed worked on the same day; `0` turns the rule off. |
+
+**Safety**
+
+| Setting | What it does |
+|---|---|
+| Unsafe content | What happens when a download contains a program or a file that should not be there: *Block and remove* (default) drops the torrent and its partial files; *Quarantine suspicious files* moves only the dangerous files and keeps the good video; *Report only* changes nothing. |
 
 **Editors**
 

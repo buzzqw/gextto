@@ -1143,6 +1143,23 @@ func formatEventLang(lang, event string, data map[string]any) string {
 		season, _ := jsonInt(mapLookup(data, "season"))
 		downloaded, _ := jsonInt(mapLookup(data, "downloaded_bytes"))
 		held := text("held_episodes")
+		if held == "" {
+			reason := text("reason")
+			if reason == "" {
+				reason = messages.PickLang(lang, "motivo non indicato", "reason not given")
+			}
+			name := text("title")
+			if name == "" {
+				name = text("name")
+			}
+			return fmt.Sprintf("%s\n\n🎬 %s\n\n%s\n\n%s",
+				messages.PickLang(lang, "🗑️ DOWNLOAD SCARTATO", "🗑️ DOWNLOAD DISCARDED"),
+				name,
+				reason,
+				fmt.Sprintf(messages.PickLang(lang,
+					"Rimosso con quanto aveva scaricato (%s): non verrà ripreso.",
+					"Removed with what it had downloaded (%s): it will not be taken again."), formatBytes(downloaded)))
+		}
 		label := text("series")
 		if label == "" {
 			label = text("title")

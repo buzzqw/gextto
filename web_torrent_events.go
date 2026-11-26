@@ -3040,14 +3040,20 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 	}
 	// Refuse to archive a broken download: a zero-filled (preallocated but
 	// never written) or unrecognised video file must not replace a good copy.
-	if err := validateCompletedFile(path); err != nil {
+	validPath, validationErr := validCompletedVideoBeside(path)
+	if validationErr != nil {
 		quarantined := quarantineCorruptFile(path, cfg)
 		// The caller writes the single ERROR for this acquisition, with the
 		// same reason and the acquisition id: logging it here too made one
 		// failure look like two.
 		logging.Debug("completed file failed integrity validation; not archiving",
-			"name", event.Name, "path", path, "error", err.Error(), "quarantined", quarantined)
-		return false, fmt.Errorf("integrity validation failed: %w", err)
+			"name", event.Name, "path", path, "error", validationErr.Error(), "quarantined", quarantined)
+		return false, fmt.Errorf("integrity validation failed: %w", validationErr)
+	}
+	if validPath != path {
+		logging.Info(fmt.Sprintf("🧹 «%s» named a file that failed integrity validation; Gextto archives the valid copy %s beside it instead",
+			event.Name, filepath.Base(validPath)), "hash", event.Hash)
+		path = validPath
 	}
 	logging.Debug("completed file passed integrity check", "name", event.Name, "path", path)
 	if !release.IsPack && !recoveredExisting {

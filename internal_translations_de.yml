@@ -6827,3 +6827,10 @@ deu:
   "Conferma il rischio di hit-and-run per seminare questa copia.": "Bestätige das Hit-and-Run-Risiko, bevor du diese Kopie seedest."
   "Impossibile seminare questa copia:": "Diese Kopie konnte nicht geseet werden:"
   "Il seeding di questa copia può finire prima dei limiti impostati; verifica le regole del tracker.": "Das Seeden dieser Kopie kann vor den eingestellten Zielen enden; prüfe die Tracker-Regeln."
+
+  # ingress content policy
+  "Contenuti non sicuri": "Unsichere Inhalte"
+  "Blocca e rimuovi": "Blockieren und entfernen"
+  "Quarantena i file sospetti": "Verdächtige Dateien in Quarantäne"
+  "Solo avviso": "Nur melden"
+  "Cosa succede quando un download contiene un programma o un file che non dovrebbe esserci. Blocca rimuove il torrent e i file parziali; Quarantena sposta solo i file sospetti e lascia il video buono; Solo avviso non tocca nulla. Senza video valido la quarantena non è possibile e il torrent viene bloccato come prima.": "Was passiert, wenn ein Download ein Programm oder eine Datei enthält, die dort nicht hingehört. Blockieren entfernt den Torrent und die Teildateien; Quarantäne verschiebt nur die verdächtigen Dateien und behält das gute Video; Nur melden ändert nichts. Ohne gültiges Video ist Quarantäne nicht möglich und der Torrent wird wie zuvor blockiert."

@@ -136,6 +136,7 @@ const (
 	settingHardlinkSeeding                  = "hardlink_seeding"
 	settingPackInspection                   = "pack_inspection"
 	settingPackInspectionPrioritize         = "pack_inspection_prioritize"
+	settingIngressContentPolicy             = "ingress_content_policy"
 	settingTorrentStallAfterMin             = "torrent_stall_after_min"
 	settingTorrentStallRetryMin             = "torrent_stall_retry_min"
 	settingTorrentStallGiveupMin            = "torrent_stall_giveup_min"
@@ -394,6 +395,7 @@ var settingKeyNames = []string{
 	"hardlink_seeding",
 	"pack_inspection",
 	"pack_inspection_prioritize",
+	"ingress_content_policy",
 	"torrent_stall_after_min",
 	"torrent_stall_retry_min",
 	"torrent_stall_giveup_min",
