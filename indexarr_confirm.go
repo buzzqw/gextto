@@ -160,7 +160,7 @@ func notifyIndexarrCompletion(cfg *Config, hash, protocol, title string, size in
 			sent = true
 			for _, target := range targets {
 				ctx, cancel := context.WithTimeout(context.Background(), indexarrConfirmTimeout)
-				err := sendIndexarrConfirmation(ctx, http.DefaultClient, target, payload)
+				err := sendIndexarrConfirmation(ctx, defaultHTTPClient, target, payload)
 				cancel()
 				if err != nil {
 					sent = false

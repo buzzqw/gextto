@@ -465,13 +465,9 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadGateway, fmt.Sprintf("remote torrent returned %s", response.Status))
 		return
 	}
-	payload, err := io.ReadAll(response.Body)
+	payload, err := readLimitedBodyHint(response.Body, 5_000_000, response.ContentLength)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	if len(payload) > 5_000_000 {
-		jsonError(w, http.StatusBadRequest, "torrent file is too large")
 		return
 	}
 	dir := filepath.Join(cfg.DataDir, "incomplete")

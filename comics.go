@@ -1024,7 +1024,7 @@ func (c *GetComicsClient) fetch(rawURL string) (string, error) {
 		return "", err
 	}
 	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
+	body, err := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 	if err != nil {
 		return "", err
 	}
@@ -1116,7 +1116,7 @@ func (c *GetComicsClient) ResolveMega(rawURL string) (string, error) {
 		response.Body.Close()
 		return finalURL, nil
 	}
-	body, err := io.ReadAll(response.Body)
+	body, err := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 	response.Body.Close()
 	if err != nil {
 		return "", err
@@ -1182,7 +1182,7 @@ func (c *GetComicsClient) WeeklyLinks(date string) (string, ComicLinks, error) {
 		if err != nil {
 			continue
 		}
-		body, err := io.ReadAll(response.Body)
+		body, err := readLimitedBodyHint(response.Body, maxFeedResponseBytes, response.ContentLength)
 		response.Body.Close()
 		if err != nil {
 			return "", ComicLinks{}, err
@@ -1628,7 +1628,7 @@ func DownloadTorrentFile(client *http.Client, rawURL, targetDir string) (string,
 	if contentType := strings.ToLower(response.Header.Get("Content-Type")); strings.Contains(contentType, "text/html") {
 		return "", fmt.Errorf("torrent URL returned HTML instead of a torrent file")
 	}
-	payload, err := io.ReadAll(response.Body)
+	payload, err := readLimitedBodyHint(response.Body, maxComicTorrentMetainfoSize, response.ContentLength)
 	if err != nil {
 		return "", err
 	}

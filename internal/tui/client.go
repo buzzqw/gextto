@@ -315,10 +315,13 @@ type Client struct {
 // NewClient builds a client for base (e.g. http://127.0.0.1:5000).
 func NewClient(base string) *Client {
 	traffic := &trafficCounter{}
+	base = strings.TrimRight(strings.TrimSpace(base), "/")
+	origin, _ := url.Parse(base)
 	return &Client{
-		base: strings.TrimRight(strings.TrimSpace(base), "/"),
+		base: base,
 		http: &http.Client{Timeout: 30 * time.Second, Transport: &countingTransport{
 			base: http.DefaultTransport, counter: traffic, apiKey: strings.TrimSpace(os.Getenv("GEXTTO_API_KEY")),
+			origin: origin,
 		}},
 		traffic: traffic,
 	}
@@ -346,10 +349,13 @@ type countingTransport struct {
 	// apiKey (GEXTTO_API_KEY) reaches a daemon whose access control asks
 	// for a login from outside the local network.
 	apiKey string
+	// origin is the daemon the key belongs to: a redirect elsewhere never
+	// receives it.
+	origin *url.URL
 }
 
 func (t *countingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	if t.apiKey != "" && request.Header.Get("X-Api-Key") == "" {
+	if t.apiKey != "" && request.Header.Get("X-Api-Key") == "" && sameOrigin(t.origin, request.URL) {
 		request = request.Clone(request.Context())
 		request.Header.Set("X-Api-Key", t.apiKey)
 	}
@@ -1010,4 +1016,13 @@ func (c *Client) emitEvent(payload string, snapshots func([]string), lines func(
 	if line, ok := value["line"]; ok && lines != nil {
 		lines(fmt.Sprint(line))
 	}
+}
+
+// sameOrigin reports whether u is on the daemon's scheme and host (port
+// included). Without a parsed origin the key is sent as before.
+func sameOrigin(origin, u *url.URL) bool {
+	if origin == nil || origin.Host == "" {
+		return true
+	}
+	return u != nil && strings.EqualFold(origin.Scheme, u.Scheme) && strings.EqualFold(origin.Host, u.Host)
 }

@@ -499,3 +499,28 @@ func TestClientReadsEd2kStatus(t *testing.T) {
 		t.Fatalf("status = %+v", status.Status)
 	}
 }
+
+func TestAPIKeyStaysOnTheDaemonAcrossRedirects(t *testing.T) {
+	var leaked string
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		leaked = r.Header.Get("X-Api-Key")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer target.Close()
+	var sent string
+	daemon := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent = r.Header.Get("X-Api-Key")
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusFound)
+	}))
+	defer daemon.Close()
+
+	t.Setenv("GEXTTO_API_KEY", "secret")
+	c := NewClient(daemon.URL)
+	_, _ = c.Status(context.Background())
+	if sent != "secret" {
+		t.Fatalf("the daemon itself did not receive the key: %q", sent)
+	}
+	if leaked != "" {
+		t.Fatalf("the API key reached another host after a redirect: %q", leaked)
+	}
+}

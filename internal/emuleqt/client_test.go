@@ -231,3 +231,22 @@ func TestErrorsCarryTheCoreMessage(t *testing.T) {
 		t.Fatal("a client without address must fail")
 	}
 }
+
+func TestRedirectToAnotherHostDropsTheAPIKey(t *testing.T) {
+	var leaked string
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		leaked = r.Header.Get("X-Api-Key")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer target.Close()
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusFound)
+	}))
+	defer core.Close()
+
+	c := New(Config{BaseURL: core.URL, APIKey: "secret"})
+	_ = c.do(context.Background(), http.MethodGet, "/api/v1/status", nil, nil, nil)
+	if leaked != "" {
+		t.Fatalf("the API key reached another host after a redirect: %q", leaked)
+	}
+}

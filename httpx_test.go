@@ -2,7 +2,11 @@ package gextto
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -20,6 +24,16 @@ func TestReadLimitedBodyWithinLimit(t *testing.T) {
 func TestReadLimitedBodyOverLimit(t *testing.T) {
 	if _, err := readLimitedBody(strings.NewReader("hello!"), 5); err == nil {
 		t.Fatal("readLimitedBody must reject a body larger than the limit")
+	}
+}
+
+func TestReadLimitedBodyHintCapsUntrustedPreallocation(t *testing.T) {
+	payload, err := readLimitedBodyHint(strings.NewReader("x"), 8<<20, 8<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cap(payload) > 1<<20 {
+		t.Fatalf("a one-byte body reserved %d bytes from an untrusted size hint", cap(payload))
 	}
 }
 
@@ -83,5 +97,42 @@ func TestCopyLimitedOverLimit(t *testing.T) {
 	var buffer bytes.Buffer
 	if err := copyLimited(&buffer, strings.NewReader("hello!"), 5); err == nil {
 		t.Fatal("copyLimited must reject a source larger than the limit")
+	}
+}
+
+func TestRedirectDropsCredentialsAcrossOrigins(t *testing.T) {
+	var apiKey, plexToken, authorization string
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiKey = r.Header.Get("X-Api-Key")
+		plexToken = r.Header.Get("X-Plex-Token")
+		authorization = r.Header.Get("Authorization")
+		_, _ = io.WriteString(w, "ok")
+	}))
+	defer target.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL, http.StatusFound)
+	}))
+	defer origin.Close()
+
+	response, err := HTTPGet(context.Background(), origin.URL, map[string]string{
+		"X-Api-Key":     "secret-api-key",
+		"X-Plex-Token":  "secret-plex-token",
+		"Authorization": "Bearer secret-token",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if apiKey != "" || plexToken != "" || authorization != "" {
+		t.Fatalf("cross-origin redirect received credentials: api_key=%q plex_token=%q authorization=%q", apiKey, plexToken, authorization)
+	}
+}
+
+func TestSafeRedirectRejectsHTTPSDowngrade(t *testing.T) {
+	origin := &url.URL{Scheme: "https", Host: "example.test"}
+	target := &url.URL{Scheme: "http", Host: "example.test"}
+	req := &http.Request{URL: target, Header: make(http.Header)}
+	if err := safeRedirect(req, []*http.Request{{URL: origin}}); err == nil {
+		t.Fatal("an HTTPS to HTTP redirect must be refused")
 	}
 }

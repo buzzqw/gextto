@@ -12,18 +12,44 @@ import (
 )
 
 // defaultHTTPClient is the shared client for provider/source requests. It
-// follows the reqwest defaults used by gextto (redirects, gzip automatic).
+// follows the reqwest defaults used by gextto (redirects, gzip automatic), but
+// never forwards credentials to another origin or downgrades HTTPS.
 var defaultHTTPClient = &http.Client{
-	Timeout: 90 * time.Second,
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return errors.New("stopped after 10 redirects")
-		}
-		if req.URL != nil && strings.EqualFold(req.URL.Scheme, "magnet") {
-			return http.ErrUseLastResponse
-		}
+	Timeout:       90 * time.Second,
+	CheckRedirect: safeRedirect,
+}
+
+var sensitiveRedirectHeaders = [...]string{
+	"Authorization",
+	"Proxy-Authorization",
+	"Cookie",
+	"X-Api-Key",
+	"Api-Key",
+	"X-Plex-Token",
+	"X-Api-Token",
+	"X-Auth-Token",
+}
+
+func safeRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if req.URL != nil && strings.EqualFold(req.URL.Scheme, "magnet") {
+		return http.ErrUseLastResponse
+	}
+	if len(via) == 0 || req.URL == nil {
 		return nil
-	},
+	}
+	origin := via[0].URL
+	if strings.EqualFold(origin.Scheme, "https") && !strings.EqualFold(req.URL.Scheme, "https") {
+		return errors.New("refusing an HTTPS downgrade redirect")
+	}
+	if !strings.EqualFold(origin.Scheme, req.URL.Scheme) || !strings.EqualFold(origin.Host, req.URL.Host) {
+		for _, name := range sensitiveRedirectHeaders {
+			req.Header.Del(name)
+		}
+	}
+	return nil
 }
 
 // Response size limits. They are intentionally generous: the goal is to avoid
@@ -61,6 +87,12 @@ func readLimitedBodyHint(r io.Reader, limit, hint int64) ([]byte, error) {
 	}
 	if hint > limit {
 		hint = limit
+	}
+	// Content-Length is controlled by the remote server. Preallocating the
+	// whole declaration lets a one-byte answer reserve tens of megabytes.
+	const maxInitialBodyBuffer = 1 << 20
+	if hint > maxInitialBodyBuffer {
+		hint = maxInitialBodyBuffer
 	}
 	if hint < 0 {
 		hint = 0

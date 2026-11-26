@@ -69,7 +69,7 @@ func New(cfg Config) *Client {
 		if timeout <= 0 {
 			timeout = 15 * time.Second
 		}
-		client = &http.Client{Timeout: timeout}
+		client = &http.Client{Timeout: timeout, CheckRedirect: dropKeyAcrossOrigins}
 	}
 	return &Client{base: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), key: cfg.APIKey, client: client}
 }
@@ -546,4 +546,17 @@ func (c *Client) PatchPreferences(ctx context.Context, values map[string]any) er
 // SetLimits sets the speed limits in KiB/s (0 = unlimited).
 func (c *Client) SetLimits(ctx context.Context, downloadKiB, uploadKiB int64) error {
 	return c.do(ctx, http.MethodPatch, "/api/v1/preferences", nil, map[string]any{"maxDownload": downloadKiB, "maxUpload": uploadKiB}, nil)
+}
+
+// dropKeyAcrossOrigins follows a redirect like the default policy, but never
+// carries the API key to another scheme or host: Go protects Authorization
+// and Cookie on its own, not custom headers such as X-Api-Key.
+func dropKeyAcrossOrigins(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	if origin := via[0].URL; !strings.EqualFold(origin.Scheme, req.URL.Scheme) || !strings.EqualFold(origin.Host, req.URL.Host) {
+		req.Header.Del("X-Api-Key")
+	}
+	return nil
 }
