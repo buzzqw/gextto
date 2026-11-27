@@ -277,6 +277,8 @@ cleans up. `scripts/nightly-benchmarks.sh` runs the Go benchmarks too, and a rou
 gx-torrent alone that replaces only its rows is `--compare-only --clients gx-torrent`. Both
 wait for a host without an ffmpeg of another program and stop the round when it stays busy:
 a run marked disturbed is not a figure, and waiting out the budget for it is a lost night.
+`bench-all.sh` samples the host for the whole Go pass too: a pass measured while something
+else was using the machine is marked in its raw file and does not replace `latest.txt`.
 Results are written to `gextto-data/bench/compare.jsonl`. Changing the machine, a
 version, a limit or a payload starts a new baseline: run every client again and replace every
 table above.
@@ -473,7 +475,7 @@ run at once per torrent.
 | `make test-ui` (Playwright, Chromium) | 63–72 s |
 | CI (`ci.yml` / `continuous.yml` / `codeql.yml`), 2 vCPU runners | 411 s / 278 s / 210 s |
 
-The suite has 3,010 Go tests in 72 packages, 79 Playwright tests and 89 Go benchmarks.
+The suite has 3,808 Go test functions, 119 Playwright tests and 108 Go benchmarks.
 
 ## Verified without a benchmark
 

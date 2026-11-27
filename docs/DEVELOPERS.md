@@ -443,7 +443,8 @@ the checkout has uncommitted changes, and writes the tables. `scripts/nightly-be
 is the nightly pass that runs the Go benchmarks in the same night (`--go-only`,
 `--compare-only`, `--clients`, `--rounds`); both refuse a host where another
 program is decoding, because its ffmpeg marks every comparison run disturbed and
-the run is thrown away. The anacrolix row
+the run is thrown away. `bench-all.sh` does the same for the Go pass and keeps a raw file
+disturbed by the host out of `latest.txt`. The anacrolix row
 is driven by `scripts/compare/anacrolix`, a small HTTP front end over the
 library. Docker's build cache is not
 part of the work area: `docker builder prune` after a round that rebuilt the
