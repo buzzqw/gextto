@@ -2,9 +2,10 @@ package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go.
 // Conn is one uTP stream. A Socket owns its Conns and dispatches packets to and
-// from them. Every Conn and Socket state change is serialised by the package
-// mutex mu, so the code below assumes mu is held (methods document the rare
-// exceptions).
+// from them. Conn state is guarded by c.mu, Socket state by socketMu; methods
+// below assume c.mu is held and document the exceptions. The only permitted
+// lock order is socketMu -> c.mu: c.mu is released before taking socketMu, and
+// no lock is held across a network syscall.
 
 import (
 	"errors"
@@ -12,12 +13,17 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
 // Conn is a uTP stream and implements net.Conn. Create it through a Socket
 // (newConn); the zero value is not usable.
 type Conn struct {
+	// mu guards all Conn state below. The Socket lock is never taken while
+	// mu is held (detach releases mu first); no syscall runs under mu.
+	mu sync.RWMutex
+
 	// recv_id is the id the peer writes in packets to us; send_id the one we
 	// write in packets to it. seq_nr counts our data packets, ack_nr the
 	// highest inbound sequence number consumed, lastAck the highest one the
@@ -43,7 +49,7 @@ type Conn struct {
 	socket           *Socket
 	remoteSocketAddr net.Addr
 	// sendBatchBuf is the burst buffer Write reuses: one allocation per
-	// connection instead of one per write (Write runs under mu).
+	// connection instead of one per write (Write runs under c.mu).
 	sendBatchBuf sendBatch
 	// startTimestamp anchors the uTP microsecond clock (see timestamp).
 	startTimestamp uint32
@@ -101,8 +107,8 @@ func (c *Conn) timestamp() uint32 { return nowTimestamp() - c.startTimestamp }
 
 // sendPendingSendStateTimerCallback flushes a batched state packet.
 func (c *Conn) sendPendingSendStateTimerCallback() {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.sendPendingSendStateTimerActive = false
 	c.sendPendingSendSendStateTimer.Stop()
 	c.sendPendingState()
@@ -176,20 +182,22 @@ func (c *Conn) makePacket(_type st, connID, seqNr uint16, payload []byte) (p []b
 
 // send writes one packet to the peer, or adds it to the current burst when
 // batch is not nil (Conn.Write), so a whole write leaves in one syscall where
-// the platform allows it. Callers hold mu.
+// the platform allows it. Callers hold c.mu: a direct write releases it around
+// the syscall and takes it back before updating state. The packet buffer stays
+// alive until the write returns and is then returned to the pool.
 func (c *Conn) send(batch *sendBatch, _type st, connID uint16, payload []byte, seqNr uint16) (err error) {
 	p, buffer := c.makePacket(_type, connID, seqNr, payload)
 	if batch != nil {
-		err = batch.add(c.socket, c.remoteSocketAddr, p)
+		batch.add(p)
 		sendBufferPool.Put(buffer)
-		if err != nil {
-			return
-		}
 	} else {
-		n1, err := c.socket.writeTo(p, c.remoteSocketAddr)
+		addr := c.remoteSocketAddr
+		c.mu.Unlock()
+		n1, writeErr := c.socket.writeTo(p, addr)
 		sendBufferPool.Put(buffer)
-		if err != nil {
-			return err
+		c.mu.Lock()
+		if writeErr != nil {
+			return writeErr
 		}
 		if n1 != len(p) {
 			panic(n1)
@@ -200,6 +208,16 @@ func (c *Conn) send(batch *sendBatch, _type st, connID uint16, payload []byte, s
 		unsentStatePackets.Add(1)
 	}
 	return
+}
+
+// flushBatch sends the collected burst without holding c.mu, then takes c.mu
+// again before returning to the caller. The batch belongs to this Conn and is
+// touched only by Write, so its buffers stay alive across the unlocked window.
+func (c *Conn) flushBatch(batch *sendBatch) error {
+	c.mu.Unlock()
+	err := batch.flush(c.socket, c.remoteSocketAddr)
+	c.mu.Lock()
+	return err
 }
 
 // unpendSendState cancels a batched state packet and reports whether one was
@@ -245,6 +263,14 @@ func (c *Conn) write(batch *sendBatch, _type st, connID uint16, payload []byte, 
 	}
 	if len(payload) > maxPayloadSize {
 		payload = payload[:maxPayloadSize]
+	}
+	if batch != nil && len(batch.sizes) >= maxBatchSegments {
+		// The batch is full; send it before adding another packet. flushBatch
+		// releases c.mu for the syscall and takes it back before we go on.
+		if err := c.flushBatch(batch); err != nil {
+			c.destroy(fmt.Errorf("error sending packet: %w", err))
+			return 0, err
+		}
 	}
 	if err := c.send(batch, _type, connID, payload, seqNr); err != nil {
 		c.destroy(fmt.Errorf("error sending packet: %w", err))
@@ -390,7 +416,7 @@ func (c *Conn) resendTimeout() time.Duration {
 }
 
 // noteRTOTimeout is the feedback for the adaptive RTO: it doubles the backoff,
-// capped at maxRTOBackoff. Called from send.timeoutResend under mu.
+// capped at maxRTOBackoff. Called from send.timeoutResend under c.mu.
 func (c *Conn) noteRTOTimeout() {
 	if !adaptiveRTO.Load() {
 		return
@@ -408,7 +434,7 @@ func (c *Conn) noteRTOTimeout() {
 
 // noteDelivery relaxes the adaptive RTO backoff by half (floor 1) when a packet
 // is acknowledged, so a link that recovers stops paying for a past stall.
-// Called from Conn.ack under mu.
+// Called from Conn.ack under c.mu.
 func (c *Conn) noteDelivery() {
 	if !adaptiveRTO.Load() {
 		return
@@ -419,7 +445,7 @@ func (c *Conn) noteDelivery() {
 }
 
 // ackSkipped is called for a packet the peer did not acknowledge: a run of
-// skipped packets triggers a fast resend. Called from applyAcks under mu.
+// skipped packets triggers a fast resend. Called from applyAcks under c.mu.
 func (c *Conn) ackSkipped(seqNr uint16) {
 	s := c.seqSend(seqNr)
 	if s == nil {
@@ -440,7 +466,7 @@ func (c *Conn) ackSkipped(seqNr uint16) {
 }
 
 // scheduleResendLocked arms the connection's single RTO timer for the oldest
-// outstanding packet, or stops it when nothing is waiting. The caller holds mu.
+// outstanding packet, or stops it when nothing is waiting. The caller holds c.mu.
 //
 // The front of unackedSends is the oldest packet still unacknowledged, so its
 // deadline is the earliest one in the normal case; the timer callback scans the
@@ -478,8 +504,8 @@ func (c *Conn) scheduleResendLocked() {
 // has come, destroys the connection when a packet waited past writeTimeout, and
 // re-arms the timer for the next one.
 func (c *Conn) resendDue() {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.resendTimer = nil
 	c.resendTimerDue = time.Time{}
 	if c.destroyed.IsSet() {
@@ -508,8 +534,13 @@ func (c *Conn) resendDue() {
 	c.scheduleResendLocked()
 }
 
-// receivePacket hands one inbound packet to the connection state machine.
+// receivePacket hands one inbound packet to the connection state machine. The
+// caller holds c.mu; the Socket lock has been released before the call, so a
+// packet delivered to a connection torn down meanwhile is simply ignored.
 func (c *Conn) receivePacket(h header, payload []byte) {
+	if c.destroyed.IsSet() {
+		return
+	}
 	c.packetReadTimeoutTimer.Reset(packetReadTimeout)
 	c.processDelivery(h, payload)
 }
@@ -517,9 +548,9 @@ func (c *Conn) receivePacket(h header, payload []byte) {
 // receivePacketTimeoutCallback destroys a connection that heard nothing for
 // packetReadTimeout.
 func (c *Conn) receivePacketTimeoutCallback() {
-	mu.Lock()
+	c.mu.Lock()
 	c.destroy(errors.New("no packet read timeout"))
-	mu.Unlock()
+	c.mu.Unlock()
 }
 
 // lazyDestroy tears the connection down once it has said goodbye to the peer:
@@ -646,8 +677,8 @@ func (c *Conn) updateReadBufNotEmpty() {
 // deadline passes, so a peer that stalls is noticed exactly as before. n is
 // capped below the window we offer: the peer can always send what we wait for.
 func (c *Conn) HintRead(n int) {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.readWant = min(n, readBufferLen/2)
 	c.updateReadBufNotEmpty()
 }
@@ -678,20 +709,20 @@ func (c *Conn) processInbound() {
 }
 
 // waitAck blocks until the send with the given sequence number is acknowledged
-// or the connection is destroyed. Callers hold mu.
+// or the connection is destroyed. Callers hold c.mu.
 func (c *Conn) waitAck(seq uint16) {
 	s := c.seqSend(seq)
 	if s == nil {
 		return
 	}
-	waitEvents(&mu, &s.acked, &c.destroyed)
+	waitEvents(&c.mu, &s.acked, &c.destroyed)
 }
 
 // recvSynAck waits for our SYN to be acknowledged and returns the connection
 // error, if any. Callers hold no lock.
 func (c *Conn) recvSynAck() (err error) {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.waitAck(1)
 	if c.err != nil {
 		err = c.err
@@ -711,21 +742,30 @@ func (c *Conn) writeFin() {
 }
 
 // destroy marks the connection torn down with reason, detaching it from the
-// socket. Idempotent: the first reason wins.
+// socket. Idempotent: the first reason wins. The caller holds c.mu; detach
+// releases it around the Socket lock, and destroy takes it back before
+// returning.
 func (c *Conn) destroy(reason error) {
+	c.markDestroyed(reason)
+	c.detach()
+}
+
+// markDestroyed sets the teardown state and disarms the timers. Unlike destroy
+// it does not touch the socket, so callers holding socketMu (Socket.destroy)
+// may use it without inverting the lock order. The caller holds c.mu.
+func (c *Conn) markDestroyed(reason error) {
 	c.destroyed.Set()
 	if c.err == nil {
 		c.err = reason
 	}
-	c.detach()
 	c.stopTimers()
 }
 
 // stopTimers disarms every timer of a destroyed connection. A pending timer
 // keeps its callback, and the callback keeps the Conn with its read buffer and
 // unacknowledged sends: without this a closed connection stayed in memory for
-// up to packetReadTimeout (two minutes). A callback already running takes mu,
-// sees destroyed and returns. The caller holds mu.
+// up to packetReadTimeout (two minutes). A callback already running takes c.mu,
+// sees destroyed and returns. The caller holds c.mu.
 func (c *Conn) stopTimers() {
 	if c.resendTimer != nil {
 		c.resendTimer.Stop()
@@ -757,8 +797,8 @@ func (c *Conn) closeNow() (err error) {
 // Close closes the stream gracefully: FIN is sent and the connection tears down
 // once the peer has also finished.
 func (c *Conn) Close() (err error) {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.closed.Set()
 	c.writeFin()
 	c.lazyDestroy()
@@ -770,8 +810,8 @@ func (c *Conn) LocalAddr() net.Addr { return addr{c.socket.Addr()} }
 // Read copies buffered inbound data, blocking until some is available, the peer
 // closes, an error occurs or the read deadline passes.
 func (c *Conn) Read(b []byte) (n int, err error) {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for {
 		for c.readHeldBack() {
 			c.waitRead()
@@ -799,9 +839,9 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	}
 }
 
-// waitRead blocks until a Read has something new to look at. Callers hold mu.
+// waitRead blocks until a Read has something new to look at. Callers hold c.mu.
 func (c *Conn) waitRead() {
-	waitEvents(&mu,
+	waitEvents(&c.mu,
 		&c.gotFin,
 		&c.closed,
 		&c.destroyed,
@@ -825,19 +865,21 @@ func (c *Conn) updateCanWrite() {
 // Write sends payload to the peer, blocking while the window is full, the
 // stream is closed, an error occurs or the write deadline passes.
 func (c *Conn) Write(p []byte) (n int, err error) {
-	mu.Lock()
-	defer mu.Unlock()
+	c.mu.Lock()
 	// The packets of this write travel together: one syscall for the burst
 	// where the platform segments the datagrams (UDP GSO), one write per
 	// packet everywhere else. The batch is flushed before the connection
 	// waits for window space, or the ACK that would free it could never come.
+	// flushBatch releases c.mu for the syscall and takes it back, so the
+	// deferred flush must run before the unlock.
 	batch := &c.sendBatchBuf
 	batch.reset()
 	defer func() {
-		if flushErr := batch.flush(c.socket, c.remoteSocketAddr); flushErr != nil && err == nil {
+		if flushErr := c.flushBatch(batch); flushErr != nil && err == nil {
 			c.destroy(fmt.Errorf("error sending packet: %w", flushErr))
 			err = flushErr
 		}
+		c.mu.Unlock()
 	}()
 	for len(p) != 0 {
 		switch {
@@ -862,11 +904,11 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 			p = p[n1:]
 			continue
 		}
-		if flushErr := batch.flush(c.socket, c.remoteSocketAddr); flushErr != nil {
+		if flushErr := c.flushBatch(batch); flushErr != nil {
 			c.destroy(fmt.Errorf("error sending packet: %w", flushErr))
 			return n, flushErr
 		}
-		waitEvents(&mu,
+		waitEvents(&c.mu,
 			&c.wroteFin,
 			&c.closed,
 			&c.destroyed,
@@ -877,12 +919,11 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 }
 
 // detach removes the connection from its socket's map and lets the socket tear
-// down if it was waiting on it.
+// down if it was waiting on it. The caller holds c.mu; this method releases it
+// around the Socket lock and takes it back before returning, so no Conn lock
+// outlives into a Socket lock.
 func (c *Conn) detach() {
-	s := c.socket
-	if _, ok := s.conns[c.connKey]; !ok {
-		return
-	}
-	delete(s.conns, c.connKey)
-	s.lazyDestroy()
+	c.mu.Unlock()
+	c.socket.forgetConn(c)
+	c.mu.Lock()
 }

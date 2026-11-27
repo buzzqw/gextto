@@ -43,12 +43,12 @@ func TestDestroyedConnStopsItsTimers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mu.Lock()
+	c.mu.Lock()
 	c.closeNow()
 	readTimerArmed := c.packetReadTimeoutTimer.Stop()
 	deadlineArmed := c.connDeadlines.read.timer != nil && c.connDeadlines.read.timer.Stop()
 	resendArmed := c.resendTimer != nil
-	mu.Unlock()
+	c.mu.Unlock()
 	if readTimerArmed || deadlineArmed || resendArmed {
 		t.Fatalf("timers still armed after destroy: read timeout %v, deadline %v, resend %v",
 			readTimerArmed, deadlineArmed, resendArmed)
@@ -92,9 +92,9 @@ func TestUnknownPacketFloodBoundsResetWriters(t *testing.T) {
 	buf := make([]byte, maxHeaderSize)
 	packet := buf[:h.Marshal(buf)]
 	for i := 0; i < 200; i++ {
-		mu.Lock()
+		socketMu.Lock()
 		s.handleReceivedPacket(read{data: packet, from: from})
-		mu.Unlock()
+		socketMu.Unlock()
 	}
 	if got := s.resetsInFlight.Load(); got > maxResetsInFlight {
 		t.Fatalf("%d reset writers in flight, want at most %d", got, maxResetsInFlight)

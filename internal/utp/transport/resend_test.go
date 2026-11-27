@@ -78,13 +78,13 @@ func TestBacklogEvictionIsCounted(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.CloseNow()
-	mu.Lock()
+	socketMu.Lock()
 	for i := 0; i < 51; i++ {
 		s.pushBacklog(syn{seq_nr: uint16(i), conn_id: uint16(i + 1), addr: netip.MustParseAddrPort("198.51.100.9:51413")})
 	}
 	n := len(s.backlog)
 	drops := s.SynDrops()
-	mu.Unlock()
+	socketMu.Unlock()
 	if n != 50 {
 		t.Fatalf("backlog holds %d SYNs, want 50", n)
 	}
@@ -334,14 +334,16 @@ func silentPeerResends(t *testing.T, adaptive bool, floor, window time.Duration)
 	_ = dialed.SetWriteDeadline(time.Now().Add(window))
 	_, _ = dialed.Write(make([]byte, 8<<20))
 	timeout, _ := client.ResendStats()
-	mu.Lock()
+	socketMu.Lock()
 	var maxBackoff uint32
 	for _, cc := range client.conns {
+		cc.mu.Lock() // socketMu -> Conn.mu is the permitted order
 		if cc.rtoBackoff > maxBackoff {
 			maxBackoff = cc.rtoBackoff
 		}
+		cc.mu.Unlock()
 	}
-	mu.Unlock()
+	socketMu.Unlock()
 	return timeout, maxBackoff
 }
 

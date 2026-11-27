@@ -19,9 +19,9 @@ func TestOutOfOrderPayloadSurvivesBufferReuse(t *testing.T) {
 	}
 	defer s.CloseNow()
 
-	mu.Lock()
-	defer mu.Unlock()
 	c := s.newConn(pc.LocalAddr())
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	defer c.packetReadTimeoutTimer.Stop()
 	c.recv_id = 7
 	c.synAcked = true
@@ -53,9 +53,9 @@ func TestConsumedInboundSlotReleasesPayload(t *testing.T) {
 	}
 	defer s.CloseNow()
 
-	mu.Lock()
-	defer mu.Unlock()
 	c := s.newConn(pc.LocalAddr())
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	defer c.packetReadTimeoutTimer.Stop()
 	c.recv_id = 7
 	c.synAcked = true

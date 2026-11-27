@@ -95,7 +95,10 @@ func init() {
 }
 
 var (
-	mu                         sync.RWMutex
+	// socketMu protects Socket state and the sockets registry. Each Conn has
+	// its own mu for its state. The only permitted order is socketMu -> Conn.mu:
+	// code holding a Conn lock must release it before taking socketMu.
+	socketMu                   sync.RWMutex
 	sockets                    = map[*Socket]struct{}{}
 	logLevel                   = 0
 	artificialPacketDropChance = 0.0

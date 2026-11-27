@@ -3,8 +3,11 @@
 // instrumented freely. The engine talks to internal/utp, never here directly.
 //
 // A Socket multiplexes one packet connection and hands each uTP packet to the
-// Conn it belongs to; a Conn is a uTP stream and implements net.Conn. Every
-// Conn and Socket state change is serialised by the package mutex mu.
+// Conn it belongs to; a Conn is a uTP stream and implements net.Conn. Socket
+// state is guarded by socketMu and each Conn's state by its own mu. The only
+// permitted lock order is socketMu -> Conn.mu: a Conn lock is released before
+// taking the socket lock, and no lock is held across a network syscall, so
+// independent connections can make progress at the same time.
 //
 // Highlights of this implementation:
 //   - a floor on the sampled RTT (minLatency) and a loss-driven per-connection

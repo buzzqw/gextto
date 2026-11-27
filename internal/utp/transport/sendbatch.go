@@ -35,17 +35,12 @@ func (b *sendBatch) reset() {
 	b.sizes = b.sizes[:0]
 }
 
-// add copies one packet into the batch, flushing a full batch first to keep
-// the packet order.
-func (b *sendBatch) add(s *Socket, addr net.Addr, p []byte) error {
-	if len(b.sizes) >= maxBatchSegments {
-		if err := b.flush(s, addr); err != nil {
-			return err
-		}
-	}
+// add copies one packet into the batch. It never writes to the network: the
+// caller flushes a full batch before adding another packet, so the syscall can
+// run without any lock held.
+func (b *sendBatch) add(p []byte) {
 	b.data = append(b.data, p...)
 	b.sizes = append(b.sizes, len(p))
-	return nil
 }
 
 // flush writes every collected packet and empties the batch. One packet takes

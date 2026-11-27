@@ -13,11 +13,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// gsoOOB is the control message every segmented send builds: the same 24 bytes
-// each time, so it lives here instead of on the heap. Only gsoSend touches it,
-// and every send runs under the package mutex.
-var gsoOOB [24]byte // CmsgSpace(2): 16-byte header plus the aligned data
-
 // gsoSend writes data as len(sizes) datagrams, all of the first packet's size
 // except the last, with one call. It reports false when the batch does not
 // have that shape or the socket is not a plain UDP socket.
@@ -53,7 +48,9 @@ func (s *Socket) gsoSend(data []byte, sizes []int, addr net.Addr) bool {
 		return false
 	}
 	// UDP_SEGMENT carries a __u16 and the kernel wants the exact cmsg length.
-	// The control message is the same for every send, so it is reused.
+	// The control message is local to this call: writes run without locks, so
+	// a shared scratch buffer would race. It is 24 bytes on the stack.
+	var gsoOOB [24]byte // CmsgSpace(2): 16-byte header plus the aligned data
 	oob := gsoOOB[:]
 	h := (*unix.Cmsghdr)(unsafe.Pointer(&oob[0]))
 	h.Level = unix.IPPROTO_UDP

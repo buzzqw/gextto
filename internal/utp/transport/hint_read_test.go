@@ -158,8 +158,8 @@ func TestHintReadYieldsToTheClose(t *testing.T) {
 func TestHintReadStaysBelowTheWindow(t *testing.T) {
 	_, server := hintPair(t)
 	server.HintRead(10 * readBufferLen)
-	mu.Lock()
-	defer mu.Unlock()
+	server.mu.Lock()
+	defer server.mu.Unlock()
 	if server.readWant != readBufferLen/2 {
 		t.Fatalf("readWant = %d, want %d", server.readWant, readBufferLen/2)
 	}
@@ -169,9 +169,9 @@ func waitBuffered(t *testing.T, c *Conn, want int) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		mu.Lock()
+		c.mu.Lock()
 		got := c.bufferedInbound()
-		mu.Unlock()
+		c.mu.Unlock()
 		if got >= want {
 			return
 		}

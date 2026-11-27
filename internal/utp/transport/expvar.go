@@ -3,7 +3,10 @@ package transport
 // GEXTTO: our own uTP (BEP 29) code; see doc.go. expvar counters for the uTP stack, exported on the
 // process's /debug/vars page for diagnostics.
 
-import "expvar"
+import (
+	"expvar"
+	"sync/atomic"
+)
 
 var (
 	// ackSkippedResends counts selective-ACK fast resends.
@@ -29,6 +32,7 @@ var (
 	gsoPackets = expvar.NewInt("utpGSOPackets")
 
 	// largestReceivedUTPPacket is the largest packet seen, exported below.
-	largestReceivedUTPPacket       int
+	// Atomic because each Socket has its own reader goroutine.
+	largestReceivedUTPPacket       atomic.Int64
 	largestReceivedUTPPacketExpvar = expvar.NewInt("utpLargestReceivedPacket")
 )

@@ -2,9 +2,11 @@ package transport
 
 // GEXTTO: our own uTP (BEP 29) code; see doc.go.
 // Socket multiplexes a net.PacketConn: it reads datagrams once and dispatches
-// each uTP packet to the Conn it belongs to. Conns and Sockets all share the
-// package mutex mu, so their state transitions are serialised (the reader loop
-// releases mu around the blocking read).
+// each uTP packet to the Conn it belongs to. Socket state is guarded by
+// socketMu, each Conn's state by its own mu. The order is always socketMu ->
+// Conn.mu: the reader releases socketMu before delivering to a Conn, and no
+// lock is held across a network syscall (the reader releases socketMu around
+// the blocking read).
 
 import (
 	"context"
@@ -115,9 +117,10 @@ func NewSocketFromPacketConn(pc net.PacketConn) (*Socket, error) {
 		pc:          pc,
 		unusedReads: make(chan read, 100),
 	}
-	mu.Lock()
+	s.connDeadlines.setOwner(&socketMu)
+	socketMu.Lock()
 	sockets[s] = struct{}{}
-	mu.Unlock()
+	socketMu.Unlock()
 	go s.reader()
 	return s, nil
 }
@@ -169,38 +172,53 @@ func (s *Socket) pushBacklog(sy syn) {
 }
 
 // reader reads the packet connection and dispatches datagrams until it is
-// closed. It holds mu for the state it touches and releases it around the
-// blocking read.
+// closed. It holds socketMu for socket state, releases it around the blocking
+// read, and hands packets to a Conn only after releasing it (handleReceivedPacket
+// does that), so the Conn lock can never be followed by a socket lock.
 func (s *Socket) reader() {
-	mu.Lock()
-	defer mu.Unlock()
 	defer s.destroy()
 	var b [maxRecvSize]byte
 	for {
+		socketMu.Lock()
+		if s.destroyed.IsSet() {
+			socketMu.Unlock()
+			return
+		}
+		// Add while holding socketMu: CloseNow waits on this group with the
+		// same lock, so no read can be started after the wait begins.
 		s.wgReadWrite.Add(1)
-		mu.Unlock()
+		socketMu.Unlock()
 		n, addr, err := s.pc.ReadFrom(b[:])
 		s.wgReadWrite.Done()
-		mu.Lock()
+		socketMu.Lock()
 		if s.destroyed.IsSet() {
+			socketMu.Unlock()
 			return
 		}
 		if err != nil {
 			log.Printf("error reading Socket PacketConn: %s", err)
 			s.ReadErr = err
+			socketMu.Unlock()
 			return
 		}
 		// The datagram is handled in place: b is reused for the next one, so
 		// whatever keeps packet bytes past this call copies them (an
 		// out-of-order payload in processDelivery, an unused read here).
 		s.handleReceivedPacket(read{data: b[:n], from: addr})
+		socketMu.Unlock()
 	}
 }
 
 func receivedUTPPacketSize(n int) {
-	if n > largestReceivedUTPPacket {
-		largestReceivedUTPPacket = n
-		largestReceivedUTPPacketExpvar.Set(int64(n))
+	for {
+		old := largestReceivedUTPPacket.Load()
+		if n <= int(old) {
+			return
+		}
+		if largestReceivedUTPPacket.CompareAndSwap(old, int64(n)) {
+			largestReceivedUTPPacketExpvar.Set(int64(n))
+			return
+		}
 	}
 }
 
@@ -220,6 +238,10 @@ func (s *Socket) connForRead(h header, from net.Addr) (*Conn, bool) {
 // connection already owns (send_id is one higher) is a conflict, and the peer
 // gets a reset.
 func (s *Socket) handlePacketReceivedForEstablishedConn(h header, from net.Addr, payload []byte, c *Conn) {
+	// socketMu is released by the caller: all state of the destination Conn,
+	// including the ids checked below and the delivery itself, belongs to c.mu.
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if h.Type == stSyn {
 		if h.ConnID == c.send_id-2 {
 			log.Print("resetting conflicting syn")
@@ -234,7 +256,9 @@ func (s *Socket) handlePacketReceivedForEstablishedConn(h header, from net.Addr,
 }
 
 // handleReceivedPacket decodes a datagram and routes it: to its connection, to
-// the SYN backlog, or to ReadFrom (a reset or an unknown packet).
+// the SYN backlog, or to ReadFrom (a reset or an unknown packet). Callers hold
+// socketMu; it is released while the packet is delivered to a Conn, then taken
+// back before returning.
 func (s *Socket) handleReceivedPacket(p read) {
 	if len(p.data) < headerLen {
 		s.unusedRead(p)
@@ -248,7 +272,11 @@ func (s *Socket) handleReceivedPacket(p read) {
 	}
 	if c, ok := s.connForRead(h, p.from); ok {
 		receivedUTPPacketSize(len(p.data))
+		// The Conn takes its own lock and may need socketMu again (detach on
+		// destroy): release socketMu for the whole delivery.
+		socketMu.Unlock()
 		s.handlePacketReceivedForEstablishedConn(h, p.from, p.data[hEnd:], c)
+		socketMu.Lock()
 		return
 	}
 	// No existing connection for this packet.
@@ -299,6 +327,7 @@ func (s *Socket) reset(addr net.Addr, ackNr, connId uint16) {
 // connIDFree reports whether id is usable as a recv_id for remoteAddr: it must
 // not collide with an existing connection's recv_id, nor with its neighbours
 // (the remote would use id-1 as its send_id when dialling our own Socket).
+// Callers hold socketMu.
 func (s *Socket) connIDFree(remoteAddr netip.AddrPort, id uint16) bool {
 	if _, used := s.conns[connKey{remoteAddr, id}]; used {
 		return false
@@ -361,7 +390,9 @@ func realRemoteAddr(addr net.Addr) net.Addr {
 	return addr
 }
 
-// newConn allocates a Conn attached to this socket. Callers hold mu.
+// newConn allocates a Conn attached to this socket. Callers hold socketMu; the
+// Conn is not yet registered (and so not yet visible to the reader), so its
+// fields are safe to set before any Conn lock is taken.
 func (s *Socket) newConn(addr net.Addr) *Conn {
 	c := &Conn{
 		socket:           s,
@@ -370,6 +401,7 @@ func (s *Socket) newConn(addr net.Addr) *Conn {
 		// GEXTTO: adaptive RTO starts at the measured-behaviour multiplier.
 		rtoBackoff: 1,
 	}
+	c.connDeadlines.setOwner(&c.mu)
 	c.sendPendingSendSendStateTimer = stoppedFuncTimer(c.sendPendingSendStateTimerCallback)
 	c.packetReadTimeoutTimer = time.AfterFunc(packetReadTimeout, c.receivePacketTimeoutCallback)
 	return c
@@ -390,14 +422,16 @@ func (s *Socket) resolveAddr(network, addr string) (net.Addr, error) {
 
 func (s *Socket) network() string { return s.pc.LocalAddr().Network() }
 
-// startOutboundConn registers a new outbound connection and sends its SYN.
+// startOutboundConn registers a new outbound connection and sends its SYN. The
+// socket lock is released before the send: writeSyn runs under c.mu and writes
+// to the network with no lock held.
 func (s *Socket) startOutboundConn(addr net.Addr) (*Conn, error) {
-	mu.Lock()
-	defer mu.Unlock()
+	socketMu.Lock()
 	c := s.newConn(addr)
 	key := addrPortOf(c.remoteSocketAddr)
 	c.recv_id = s.newConnID(key)
 	c.send_id = c.recv_id + 1
+	c.seq_nr = 1
 	if logLevel >= 1 {
 		log.Printf("dial registering addr: %s", c.RemoteAddr().String())
 	}
@@ -407,10 +441,14 @@ func (s *Socket) startOutboundConn(addr net.Addr) (*Conn, error) {
 			log.Println(k, cc, cc.age())
 		}
 		log.Printf("that's %d connections", len(s.conns))
+		socketMu.Unlock()
 		return nil, errors.New("couldn't register new connection")
 	}
-	c.seq_nr = 1
+	socketMu.Unlock()
+
+	c.mu.Lock()
 	c.writeSyn()
+	c.mu.Unlock()
 	return c, nil
 }
 
@@ -432,14 +470,14 @@ func (s *Socket) DialContext(ctx context.Context, network, addr string) (net.Con
 		err = ctx.Err()
 	}
 	if err != nil {
-		mu.Lock()
+		c.mu.Lock()
 		c.destroy(errors.New("dial timeout"))
-		mu.Unlock()
+		c.mu.Unlock()
 		return nil, err
 	}
-	mu.Lock()
+	c.mu.Lock()
 	c.updateCanWrite()
-	mu.Unlock()
+	c.mu.Unlock()
 	return c, nil
 }
 
@@ -472,10 +510,10 @@ func (s *Socket) backlogChanged() {
 }
 
 // nextSyn returns the next pending SYN, blocking until one arrives or the
-// socket closes. Callers hold mu.
+// socket closes. Callers hold socketMu.
 func (s *Socket) nextSyn() (sy syn, err error) {
 	for {
-		waitEvents(&mu, &s.closed, &s.backlogNotEmpty, &s.destroyed)
+		waitEvents(&socketMu, &s.closed, &s.backlogNotEmpty, &s.destroyed)
 		if s.closed.IsSet() {
 			return sy, errClosed
 		}
@@ -490,9 +528,10 @@ func (s *Socket) nextSyn() (sy syn, err error) {
 	}
 }
 
-// ackSyn accepts a SYN: it creates the connection, sends the state packet (the
-// implicit handshake ACK) and reports ok false when the SYN duplicates an
-// existing connection (a resend, which is ACKed again).
+// ackSyn accepts a SYN: it creates the connection and reports ok false when the
+// SYN duplicates an existing connection (a resend). Callers hold socketMu; the
+// state packet that completes the handshake is sent by Accept once socketMu
+// has been released.
 func (s *Socket) ackSyn(sy syn) (c *Conn, ok bool) {
 	c = s.newConn(net.UDPAddrFromAddrPort(sy.addr))
 	c.send_id = sy.conn_id
@@ -508,24 +547,31 @@ func (s *Socket) ackSyn(sy syn) (c *Conn, ok bool) {
 		if c.send_id != sy.conn_id {
 			panic(":|")
 		}
-		c.sendState()
 		return c, false
 	}
-	c.sendState()
 	return c, true
 }
 
 // Accept blocks for the next inbound connection.
 func (s *Socket) Accept() (net.Conn, error) {
-	mu.Lock()
-	defer mu.Unlock()
 	for {
+		socketMu.Lock()
 		sy, err := s.nextSyn()
 		if err != nil {
+			socketMu.Unlock()
 			return nil, err
 		}
-		if c, ok := s.ackSyn(sy); ok {
+		c, ok := s.ackSyn(sy)
+		socketMu.Unlock()
+		// Both a fresh SYN and a resend get an immediate state packet. The
+		// send runs under c.mu, with no Socket lock held.
+		c.mu.Lock()
+		c.sendState()
+		if ok {
 			c.updateCanWrite()
+		}
+		c.mu.Unlock()
+		if ok {
 			return c, nil
 		}
 	}
@@ -579,28 +625,39 @@ func (s *Socket) Addr() net.Addr { return s.pc.LocalAddr() }
 // CloseNow closes the socket and every connection at once, without the
 // graceful FIN handshake.
 func (s *Socket) CloseNow() error {
-	mu.Lock()
-	defer mu.Unlock()
+	socketMu.Lock()
 	s.closed.Set()
+	// Conn teardown takes c.mu and may need socketMu again (detach), so it
+	// must run with socketMu released.
+	conns := make([]*Conn, 0, len(s.conns))
 	for _, c := range s.conns {
+		conns = append(conns, c)
+	}
+	socketMu.Unlock()
+	for _, c := range conns {
+		c.mu.Lock()
 		c.closeNow()
+		c.mu.Unlock()
 	}
 	s.destroy()
+	socketMu.Lock()
 	s.wgReadWrite.Wait()
+	socketMu.Unlock()
 	return nil
 }
 
 // Close starts a graceful shutdown: the socket tears down once every
 // connection has finished.
 func (s *Socket) Close() error {
-	mu.Lock()
-	defer mu.Unlock()
+	socketMu.Lock()
+	defer socketMu.Unlock()
 	s.closed.Set()
 	s.lazyDestroy()
 	return nil
 }
 
-// lazyDestroy destroys a closed socket once no connection remains.
+// lazyDestroy destroys a closed socket once no connection remains. Callers
+// hold socketMu.
 func (s *Socket) lazyDestroy() {
 	if len(s.conns) != 0 {
 		return
@@ -608,17 +665,50 @@ func (s *Socket) lazyDestroy() {
 	if !s.closed.IsSet() {
 		return
 	}
-	s.destroy()
+	s.destroyLocked()
+}
+
+// forgetConn removes c from the socket's map and lets the socket tear down if
+// it was waiting on it. It takes socketMu and never touches c.mu: callers must
+// release a Conn lock first.
+func (s *Socket) forgetConn(c *Conn) {
+	socketMu.Lock()
+	defer socketMu.Unlock()
+	if _, ok := s.conns[c.connKey]; !ok {
+		return
+	}
+	delete(s.conns, c.connKey)
+	s.lazyDestroy()
 }
 
 // destroy tears the socket down: unregisters it, closes the packet connection
-// and destroys its connections. Callers hold mu.
+// and destroys its connections. It takes socketMu itself, so callers must not
+// hold it.
 func (s *Socket) destroy() {
+	socketMu.Lock()
+	s.destroyLocked()
+	socketMu.Unlock()
+}
+
+// destroyLocked is destroy for callers that already hold socketMu. It releases
+// socketMu around the packet connection's Close syscall and takes it back
+// before touching the connection map again.
+func (s *Socket) destroyLocked() {
+	if s.destroyed.IsSet() {
+		return
+	}
 	delete(sockets, s)
 	s.destroyed.Set()
-	s.pc.Close()
-	for _, c := range s.conns {
-		c.destroy(errors.New("Socket destroyed"))
+	socketMu.Unlock()
+	_ = s.pc.Close()
+	socketMu.Lock()
+	// Connections that did not detach themselves are marked directly: calling
+	// their destroy would re-take socketMu from under a Conn lock.
+	for key, c := range s.conns {
+		delete(s.conns, key)
+		c.mu.Lock()
+		c.markDestroyed(errors.New("Socket destroyed"))
+		c.mu.Unlock()
 	}
 }
 
@@ -633,18 +723,18 @@ func (s *Socket) ReadFrom(p []byte) (int, net.Addr, error) {
 			return 0, nil, io.EOF
 		}
 		return copy(p, r.data), r.from, nil
-	case <-s.connDeadlines.read.passed.LockedChan(&mu):
+	case <-s.connDeadlines.read.passed.LockedChan(&socketMu):
 		return 0, nil, errTimeout
 	}
 }
 
 // WriteTo writes a datagram through the shared socket (DHT traffic).
 func (s *Socket) WriteTo(b []byte, addr net.Addr) (int, error) {
-	mu.Lock()
+	socketMu.Lock()
 	timedOut := s.connDeadlines.write.passed.IsSet()
 	s.wgReadWrite.Add(1)
 	defer s.wgReadWrite.Done()
-	mu.Unlock()
+	socketMu.Unlock()
 	if timedOut {
 		return 0, errTimeout
 	}

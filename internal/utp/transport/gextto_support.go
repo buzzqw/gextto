@@ -13,7 +13,8 @@ import (
 )
 
 // Event is a boolean flag backed by a channel that is closed when set. It is
-// not safe for concurrent use on its own: callers hold the socket mutex.
+// not safe for concurrent use on its own: callers hold the owning lock (a
+// Conn's mu or socketMu, depending on the event).
 type Event struct {
 	ch     chan struct{}
 	closed bool
