@@ -437,6 +437,7 @@ than the code.
 | uTP download on a 100 Mbit/s line, gx-torrent 1.1.296 | 11.2 MB/s, 48 s of CPU per GiB | state packets batched over 2 ms |
 | Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
 | uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
+| uTP over loopback, 1 / 4 / 16 connections (`BenchmarkTransferManyConnections`, 27/11 on this N97) | 134 / 276 MB/s / stalls (i/o timeout) | one socket per side; sixteen connections do not finish, which confirms the gate for per-connection locking (`docs/todo.md`) |
 | uTP over loopback, 16 KiB writes | 11.2 µs of CPU per MB (3.7 s of system time for ~730 MB); throughput 126 MB/s | one segmented `sendmsg` per write (UDP GSO); the wall time is round-trip bound |
 | Picker, rarest pick with 150 peers | 8.6 µs | one pick in a dense swarm |
 | Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |

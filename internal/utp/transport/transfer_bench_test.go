@@ -9,8 +9,10 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -86,6 +88,111 @@ func BenchmarkTransferLoopbackNoGSO(b *testing.B) {
 // HintRead and reads the message header and the block apart, so the receive
 // window fills and drains in bursts. The allocations it reports are the
 // receive path's, which the lockstep benchmark above never exercises.
+// BenchmarkTransferManyConnections is the aggregate throughput of N uTP
+// transfers sharing one socket on each side, as a swarm does. The single
+// connection benchmarks above cannot show contention on the package mutex:
+// this one can, because every sender, reader and RTO timer runs at once.
+// Compare the sub-benchmarks with the same GOMAXPROCS and -benchtime.
+func BenchmarkTransferManyConnections(b *testing.B) {
+	for _, n := range []int{1, 4, 16} {
+		b.Run(fmt.Sprintf("conns=%d", n), func(b *testing.B) {
+			serverPC, err := net.ListenPacket("udp", "127.0.0.1:0")
+			if err != nil {
+				b.Fatal(err)
+			}
+			server, err := NewSocketFromPacketConn(serverPC)
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer server.CloseNow()
+			clientPC, err := net.ListenPacket("udp", "127.0.0.1:0")
+			if err != nil {
+				b.Fatal(err)
+			}
+			client, err := NewSocketFromPacketConn(clientPC)
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer client.CloseNow()
+
+			accepted := make(chan net.Conn, n)
+			acceptErr := make(chan error, n)
+			go func() {
+				for i := 0; i < n; i++ {
+					c, err := server.Accept()
+					if err != nil {
+						acceptErr <- err
+						return
+					}
+					accepted <- c
+				}
+			}()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			type pair struct{ client, server net.Conn }
+			pairs := make([]pair, n)
+			for i := range pairs {
+				c, err := client.DialContext(ctx, "udp", server.Addr().String())
+				if err != nil {
+					b.Fatal(err)
+				}
+				defer c.Close()
+				pairs[i].client = c
+			}
+			for i := range pairs {
+				select {
+				case pairs[i].server = <-accepted:
+					defer pairs[i].server.Close()
+				case err := <-acceptErr:
+					b.Fatal(err)
+				case <-ctx.Done():
+					b.Fatal("accept timed out")
+				}
+			}
+
+			const block = 16 << 10
+			send := make([][]byte, n)
+			recv := make([][]byte, n)
+			for i := range pairs {
+				send[i] = make([]byte, block)
+				recv[i] = make([]byte, block)
+			}
+			b.SetBytes(int64(n * block))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				var wg sync.WaitGroup
+				errs := make(chan error, 2*n)
+				for j, p := range pairs {
+					// A stalled transfer is the thing this benchmark measures:
+					// end the sub-benchmark instead of waiting for the engine's
+					// two-minute packet timeout, and say how many were left.
+					_ = p.server.SetReadDeadline(time.Now().Add(20 * time.Second))
+					wg.Add(2)
+					go func(j int, p pair) {
+						defer wg.Done()
+						if _, err := p.client.Write(send[j]); err != nil {
+							errs <- err
+						}
+					}(j, p)
+					go func(j int, p pair) {
+						defer wg.Done()
+						if _, err := io.ReadFull(p.server, recv[j]); err != nil {
+							errs <- err
+						}
+					}(j, p)
+				}
+				wg.Wait()
+				close(errs)
+				for err := range errs {
+					b.Skipf("%d connections stalled: %v", n, err)
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkTransferLoopbackStream(b *testing.B) {
 	serverPC, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
