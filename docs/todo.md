@@ -18,7 +18,7 @@ here.
 The four sections are the triage: **Now** (clear value, low cost), **Measure**
 (clear value, but a number or a refactor comes first), **Plan** (medium value: a
 product decision or a UX improvement), **Later** (foundations and large
-features). 7 + 8 + 11 + 6 = 32 items.
+features). 7 + 9 + 11 + 6 = 33 items.
 
 ## Now
 
@@ -33,6 +33,7 @@ features). 7 + 8 + 11 + 6 = 32 items.
 ## Measure
 
 - **gx-torrent daemon — locks held while waiting on a run loop**: `applyTrackerListLocked`, `infoLocked` and `withTorrent` call into the torrent loop with `d.mu` held, so a loop stuck on storage could keep the daemon lock. Gate: reproduce with an unanswered `commandC`, measure how long `d.mu` stays held, then release it around the engine call.
+- **Gextto — a long import copy stops the seed policy**: the completion handler copies the files synchronously inside the event worker's tick, so on a slow destination (an NFS library, tens of minutes for a pack) no tick reaches `EnforceSeedPolicy` and a torrent keeps seeding past its ratio and time limits. Gate: reproduce with a throttled destination, measure the time the tick is blocked, then move the copy off the worker loop without letting the seed policy act before the completion event is archived.
 - **Gextto — library materialised for counts**: the Series and Movies pages and the automatic subtitle pass call `AllSeriesEpisodes`, which builds the whole library, to compute a few counts or a short target list; the movie page also matches every monitored film against every copy. Gate: aggregate SQL queries and a title index, measured on 50k episodes.
 - **Gextto — matching and parsing done twice per cycle**: `RecordSeenBatch` scores every release against every title, the cycle then matches the candidates again, and gap filling parses the same listings once per episode. Gate: carry match and score on the release and group gaps by season, with a count of `ParseQuality` calls per cycle.
 - **Gextto — archive and MediaInfo reads before the limit**: `MediaInfoBackfillTargets` loads every missing row before applying its limit, content filters with an empty query scan the whole archive, `BrowsePage` parses every row. Gate: paginated queries and a light list DTO, measured on 100k archive rows.
