@@ -3850,6 +3850,8 @@ eng:
   "Controlla integrità, chiavi esterne e indici di tutti i database": "Check integrity, foreign keys and indexes of all databases"
   "Controllo libreria e download": "Library and download check"
   "Copia archiviata presente": "Archived copy present"
+  "Copia in corso": "Copying"
+  "Gextto sta copiando i file di questo torrent nella libreria: il torrent continua a condividere e gli altri controlli aspettano che la copia finisca.": "Gextto is copying this torrent's files into the library: the torrent keeps sharing and the other checks wait until the copy finishes."
   "Copia le righe di log visibili o la selezione negli appunti": "Copy the visible log lines or the selection to the clipboard"
   "Corrispondenze archivio": "Archive matches"
   "Crea una sottocartella dedicata": "Create a dedicated subfolder"

@@ -907,6 +907,7 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 | Stalled | nessun byte in più da troppo tempo; messo in pausa | aspettare il nuovo tentativo automatico |
 | In attesa di spazio | il disco della cartella di scarico è pieno: il motore mette in pausa i download finché lo spazio non torna | liberare spazio o cambiare cartella: il download riparte da solo, anche quelli in seed continuano |
 | Seeding | completato, sta condividendo | lasciarlo finire secondo i limiti di seed |
+| Copia in corso | Gextto sta copiando i file del torrent nella libreria: intanto il torrent continua a condividere e gli altri controlli aspettano | aspettare la fine della copia: su una cartella di rete un file grande può volerci parecchio |
 | In pausa · limite seed | Gextto ha fermato la condivisione: il torrent ha raggiunto il limite di ratio, tempo o inattività | il file resta dove è; premi ▶ nella riga se vuoi continuare a condividerlo, oppure lascia che venga archiviato |
 | Spostamento | Gextto o il motore sta spostando i file in libreria | aspettare la fine dello spostamento |
 | Verifica file | il motore rilegge e verifica i pezzi già su disco | aspettare: la barra mostra l'avanzamento del controllo (pezzi verificati sul totale), non la percentuale dei dati |

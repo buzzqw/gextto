@@ -4445,6 +4445,8 @@ pol:
   "Controlla integrità, chiavi esterne e indici di tutti i database": "Sprawdź integralność, klucze obce i indeksy wszystkich baz danych"
   "Controllo libreria e download": "Sprawdzanie biblioteki i pobierania"
   "Copia archiviata presente": "Zarchiwizowana kopia obecna"
+  "Copia in corso": "Kopiowanie"
+  "Gextto sta copiando i file di questo torrent nella libreria: il torrent continua a condividere e gli altri controlli aspettano che la copia finisca.": "Gextto kopiuje pliki tego torrenta do biblioteki: torrent dalej udostępnia, a pozostałe sprawdzenia czekają na koniec kopiowania."
   "Copia le righe di log visibili o la selezione negli appunti": "Skopiuj widoczne wiersze logu lub zaznaczenie do schowka"
   "Corrispondenze archivio": "Dopasowania archiwum"
   "Crea una sottocartella dedicata": "Utwórz dedykowany podfolder"

@@ -4497,6 +4497,8 @@ fra:
   "Controlla integrità, chiavi esterne e indici di tutti i database": "Vérifie l'intégrité, les clés étrangères et les index de toutes les bases de données"
   "Controllo libreria e download": "Vérification de la bibliothèque et des téléchargements"
   "Copia archiviata presente": "Copie archivée présente"
+  "Copia in corso": "Copie en cours"
+  "Gextto sta copiando i file di questo torrent nella libreria: il torrent continua a condividere e gli altri controlli aspettano che la copia finisca.": "Gextto copie les fichiers de ce torrent vers la bibliothèque : le torrent continue de partager et les autres contrôles attendent la fin de la copie."
   "Copia le righe di log visibili o la selezione negli appunti": "Copie les lignes du journal visibles ou la sélection dans le presse-papiers"
   "Corrispondenze archivio": "Correspondances archive"
   "Crea una sottocartella dedicata": "Créer un sous-dossier dédié"

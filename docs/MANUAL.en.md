@@ -889,6 +889,7 @@ the engine downloaded and uploaded since it started.
 | Stalled | no new bytes for too long; paused | wait for the automatic retry |
 | Waiting for disk space | the download folder's disk is full: the engine pauses the downloads until space returns | free some space or change folder: the download starts again by itself, and those seeding go on |
 | Seeding | complete, sharing | let it finish according to the seeding limits |
+| Copying | Gextto is copying the torrent's files into the library: the torrent keeps sharing and the other checks wait | wait for the copy to finish: a large file on a network folder can take a long time |
 | Paused · seed limit | Gextto stopped sharing: the torrent reached the ratio, time or inactivity limit | the file stays where it is; press ▶ on the row if you want to keep sharing it, or let it be archived |
 | Moving | Gextto or the engine is moving the files into the library | wait for the move to finish |
 | Checking | the engine re-reads and verifies the pieces already on disk | wait: the bar shows the check progress (verified pieces out of the total), not the data percentage |

@@ -4504,6 +4504,8 @@ deu:
   "Controlla integrità, chiavi esterne e indici di tutti i database": "Integrität, Fremdschlüssel und Indizes aller Datenbanken prüfen"
   "Controllo libreria e download": "Bibliotheks- und Download-Prüfung"
   "Copia archiviata presente": "Archivierte Kopie vorhanden"
+  "Copia in corso": "Kopie läuft"
+  "Gextto sta copiando i file di questo torrent nella libreria: il torrent continua a condividere e gli altri controlli aspettano che la copia finisca.": "Gextto kopiert die Dateien dieses Torrents in die Bibliothek: Der Torrent teilt weiterhin und die anderen Prüfungen warten, bis die Kopie abgeschlossen ist."
   "Copia le righe di log visibili o la selezione negli appunti": "Kopiere die sichtbaren Log-Zeilen oder die Auswahl in die Zwischenablage"
   "Corrispondenze archivio": "Archiv-Treffer"
   "Crea una sottocartella dedicata": "Erstelle einen dedizierten Unterordner"

@@ -4451,6 +4451,8 @@ spa:
   "Controlla integrità, chiavi esterne e indici di tutti i database": "Comprueba la integridad, las claves externas y los índices de todas las bases de datos"
   "Controllo libreria e download": "Comprobación de biblioteca y descargas"
   "Copia archiviata presente": "Copia archivada presente"
+  "Copia in corso": "Copiando"
+  "Gextto sta copiando i file di questo torrent nella libreria: il torrent continua a condividere e gli altri controlli aspettano che la copia finisca.": "Gextto está copiando los archivos de este torrent a la biblioteca: el torrent sigue compartiendo y las demás comprobaciones esperan a que termine la copia."
   "Copia le righe di log visibili o la selezione negli appunti": "Copia las líneas del registro visibles o la selección al portapapeles"
   "Corrispondenze archivio": "Coincidencias de archivo"
   "Crea una sottocartella dedicata": "Crear una subcarpeta dedicada"

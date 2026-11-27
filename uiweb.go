@@ -208,6 +208,10 @@ type uiTorrentRow struct {
 	// every finished torrent say the same thing on every row and took two lines
 	// each. A download and a file check keep the bar, because there it moves.
 	Settled bool
+	// LibraryCopy marks a torrent whose files Gextto is copying into the
+	// library right now. The row says so, because a slow destination keeps the
+	// torrent seeding and the worker busy for a long time.
+	LibraryCopy bool
 	// SeedLimitStop marks a torrent Gextto stopped because it reached a share
 	// limit (ratio, time or inactivity). The badge says so instead of leaving
 	// an unexplained "In pausa" on a torrent that has finished seeding.
@@ -966,6 +970,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		}
 		row.ETA, row.ETASeconds = uiTorrentETA(view)
 		row.Tags = uiSplitTags(tag)
+		row.LibraryCopy = libraryCopyInProgress(view.Hash)
 		if values, ok := aux[strings.ToLower(view.Hash)]; ok {
 			row.Archived = strings.TrimSpace(values[0]) != ""
 			row.Source = values[1]

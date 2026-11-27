@@ -140,6 +140,43 @@ func TestDownloadsShowTheDiskGuardReason(t *testing.T) {
 	}
 }
 
+// A torrent whose files are being copied into the library says so on its row:
+// it keeps seeding while the worker is busy with the copy.
+func TestDownloadsShowTheLibraryCopyBadge(t *testing.T) {
+	hash := "dddd000000000000000000000000000000000005"
+	state := newTestAppState(t)
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{Hash: hash, Name: "Movie.2031.1080p.mkv", State: "seeding", Progress: 100, TotalSize: 100, TotalDone: 100},
+	}})
+	if libraryCopyInProgress(hash) {
+		t.Fatal("the copy is already marked as running")
+	}
+	end := beginLibraryCopy(hash, "/library/Movie.2031.1080p.mkv")
+	t.Cleanup(end)
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads page -> %d", code)
+	}
+	if !strings.Contains(body, "Copia in corso") {
+		t.Fatal("the downloads page does not name the library copy")
+	}
+	if !strings.Contains(body, "sta copiando i file di questo torrent") {
+		t.Fatal("the copy badge has no tooltip explaining why the torrent is still seeding")
+	}
+
+	end()
+	if libraryCopyInProgress(hash) {
+		t.Fatal("the copy is still marked as running after it ended")
+	}
+	_, body = v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if strings.Contains(body, "Copia in corso") {
+		t.Fatal("the downloads page still says a copy is running")
+	}
+}
+
 // The ratio is the last fact of a settled row: on desktop the facts keep their
 // width and stay on one line even when a long name carries a «Perché» line.
 func TestSettledRowFactsDoNotWrapOnDesktop(t *testing.T) {

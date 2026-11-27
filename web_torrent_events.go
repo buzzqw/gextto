@@ -2661,7 +2661,9 @@ func tevCompleteEpisodeFolderWithArchive(cfg *Config, db *Database, torrents Tor
 				return false, err
 			}
 		} else {
+			endCopy := beginLibraryCopy(event.Hash, target)
 			value, err := linkOrCopyFile(cfg, video, target)
+			endCopy()
 			if err != nil {
 				return false, err
 			}
@@ -2828,7 +2830,9 @@ func tevCompleteMovieWithArchive(cfg *Config, db *Database, torrents TorrentSess
 			return false, err
 		}
 	} else {
+		endCopy := beginLibraryCopy(event.Hash, target)
 		value, err := linkOrCopyFile(cfg, video, target)
+		endCopy()
 		if err != nil {
 			return false, err
 		}
