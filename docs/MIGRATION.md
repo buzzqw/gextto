@@ -66,8 +66,8 @@ by default, or `gextto` for the isolated account):
 ```ini
 [Unit]
 Description=Gextto media acquisition and archiving daemon
-After=network-online.target
-Wants=network-online.target
+After=network-online.target remote-fs.target
+Wants=network-online.target remote-fs.target
 
 [Service]
 Type=simple
