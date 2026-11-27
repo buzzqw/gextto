@@ -434,10 +434,10 @@ than the code.
 | Recheck of 4 GiB, cold, gx-torrent 1.1.296 | 3.8–4.0 s, about 4 s of CPU | reading and hashing side by side, read-ahead on |
 | Recheck of 512 MiB on the NAS (NFS 4.1, Gigabit), alone, plain / gentle | 35 / 34 MiB/s | the gentle check costs nothing; with a stream reading the NAS next to it the stream got 47–55 MiB/s against 41–48 |
 | Upload to one peer, cold, gx-torrent 1.1.296 | 180–240 MB/s, 3.2 s of CPU per GiB | read-ahead on, next block loaded in the background |
-| uTP download on a 100 Mbit/s line, gx-torrent 1.1.296 | 11.2 MB/s, 48 s of CPU per GiB | state packets batched over 2 ms |
+| uTP download on a 100 Mbit/s line, gx-torrent 1.1.398 (27/11) | 11.2 MB/s, 36.7 s of CPU per GiB | state packets batched over 2 ms; the line, not the client, is the limit |
 | Piece check, v1 / v2, 4 MiB | 2.6 / 2.1 GB/s | one hash per piece |
 | uTP over loopback (`BenchmarkTransferLoopback`) | 178–188 MB/s | single connection |
-| uTP over loopback, 1 / 4 / 16 connections (`BenchmarkTransferManyConnections`, 27/11 on this N97) | 134 / 276 MB/s / stalls (i/o timeout) | one socket per side; sixteen connections do not finish, which confirms the gate for per-connection locking (`docs/todo.md`) |
+| uTP over loopback, 1 / 4 / 16 connections (`BenchmarkTransferManyConnections`, 27/11 on this N97) | 133 / 480 MB/s / 2–5 MB/s | one socket per side, after per-connection locking; the shaped line stays at 11.2 MB/s because the line, not the lock, is the limit |
 | uTP over loopback, 16 KiB writes | 11.2 µs of CPU per MB (3.7 s of system time for ~730 MB); throughput 126 MB/s | one segmented `sendmsg` per write (UDP GSO); the wall time is round-trip bound |
 | Picker, rarest pick with 150 peers | 8.6 µs | one pick in a dense swarm |
 | Peer departure, 27,250 pieces | 94–105 µs | touches only the pieces the peer held |
