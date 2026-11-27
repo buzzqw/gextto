@@ -2279,6 +2279,9 @@ the watched folder.
 - If the log says the data folder is already in use or the port is taken,
   another instance is running: stop it and restart.
 - After a restart Gextto can take about a minute to be ready.
+- If the log says "Stopping: waiting for…", Gextto is waiting for a copy or a
+  move on a slow network: after ten minutes it stops anyway and cleans up the
+  partial file on the next start.
 
 ### The FTP backup fails
 

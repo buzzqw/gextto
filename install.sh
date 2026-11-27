@@ -723,10 +723,10 @@ ExecStart=$(systemd_exec "$INSTALL_DIR/gexttod")
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
-# Never kill Gextto while it stops: it waits for copies and moves of media
-# files to finish (they can take minutes on NFS/NAS mounts) and logs what it is
-# waiting for every 15 seconds. A SIGKILL halfway leaves partial files behind.
-TimeoutStopSec=infinity
+# Gextto waits up to ten minutes for copies and moves of media files to finish
+# (they can take minutes on NFS/NAS mounts) and logs what it is waiting for.
+# This timeout is only a backstop if the daemon itself gets stuck.
+TimeoutStopSec=15min
 
 [Install]
 WantedBy=multi-user.target

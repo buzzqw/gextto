@@ -146,20 +146,24 @@ func (s *AppState) SleepBackground(d time.Duration) bool {
 }
 
 // workerStopTimeout bounds how long shutdown waits for background work that
-// is not a file operation (a stuck network call, a slow scan). It never cuts a
-// copy or move of media files: those are always waited for, however long they
-// take (see mediaFileOps), and the service unit has no stop timeout.
+// is not a file operation (a stuck network call, a slow scan).
 var workerStopTimeout = 45 * time.Second
+
+// fileOpStopTimeout bounds the wait for a copy or move of media files. A move
+// on a network mount can hang for hours: an unbounded wait left the service
+// stuck in "stop-sigterm" and the machine without an interface until someone
+// killed the process. After this time Gextto stops anyway; the temporary file
+// is left for the cleanup on the next start.
+var fileOpStopTimeout = 10 * time.Minute
 
 // shutdownNoticeInterval is how often a long shutdown wait says what it is
 // waiting for, so a stop that takes minutes is visibly progressing.
 var shutdownNoticeInterval = time.Minute
 
 // stopBackgroundWorkers signals every worker to stop and waits for them.
-// Copies and moves of media files in progress are always awaited to the end;
-// other work gets workerStopTimeout. Before giving up on that other work the
-// file registry is closed, so a worker cannot start a new copy that the exit
-// would cut halfway.
+// Copies and moves of media files get up to fileOpStopTimeout, other work up
+// to workerStopTimeout. Before giving up on the latter the file registry is
+// closed, so a worker cannot start a new copy that the exit would cut halfway.
 func stopBackgroundWorkers(state *AppState) {
 	if state == nil {
 		return
@@ -213,11 +217,11 @@ func stopBackgroundWorkers(state *AppState) {
 			return
 		}
 		if operations := mediaFileOps.running(); len(operations) > 0 {
+			names := make([]string, len(operations))
+			for i, operation := range operations {
+				names[i] = operation.what
+			}
 			if time.Since(lastNotice) >= shutdownNoticeInterval {
-				names := make([]string, len(operations))
-				for i, operation := range operations {
-					names[i] = operation.what
-				}
 				// The elapsed time is what tells a stop that is progressing
 				// from one that is stuck: a 10 GB copy over the network is
 				// expected to take a while, and without it the same sentence
@@ -226,6 +230,11 @@ func stopBackgroundWorkers(state *AppState) {
 					len(names), pluralWord(len(names), "copy", "copies"), quotedList(names, 3),
 					logDuration(time.Since(operations[0].started))))
 				lastNotice = time.Now()
+			}
+			if time.Since(operations[0].started) >= fileOpStopTimeout {
+				logging.Warn(fmt.Sprintf("⚠️ %s did not finish within %s: Gextto stops anyway and leaves the partial file to be cleaned up at the next start",
+					quotedList(names, 3), logDuration(fileOpStopTimeout)))
+				return
 			}
 			continue
 		}

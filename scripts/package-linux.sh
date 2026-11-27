@@ -212,7 +212,7 @@ ExecStart=/opt/gextto/run.sh
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
-TimeoutStopSec=infinity
+TimeoutStopSec=15min
 
 [Install]
 WantedBy=multi-user.target

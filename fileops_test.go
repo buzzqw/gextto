@@ -86,6 +86,36 @@ func TestStopBackgroundWorkersWaitsForFileCopies(t *testing.T) {
 	}
 }
 
+// A copy or move stuck on a slow network mount must not keep the daemon in
+// stop-sigterm forever: shutdown gives up after fileOpStopTimeout and lets the
+// cleanup on the next start deal with the partial file.
+func TestStopBackgroundWorkersGivesUpOnAStuckFileCopy(t *testing.T) {
+	previousWorker, previousFile, previousNotice := workerStopTimeout, fileOpStopTimeout, shutdownNoticeInterval
+	workerStopTimeout, fileOpStopTimeout, shutdownNoticeInterval = time.Hour, 100*time.Millisecond, time.Hour
+	defer func() {
+		workerStopTimeout, fileOpStopTimeout, shutdownNoticeInterval = previousWorker, previousFile, previousNotice
+	}()
+	previous := mediaFileOps
+	mediaFileOps = &fileOperationRegistry{active: map[uint64]fileOperation{}}
+	defer func() { mediaFileOps = previous }()
+
+	state := &AppState{bgStop: make(chan struct{})}
+	state.bgWG.Add(1)
+	defer state.bgWG.Done()
+	finish := mediaFileOps.begin("Stuck.Copy.mkv")
+	defer finish()
+
+	started := time.Now()
+	stopBackgroundWorkers(state)
+	elapsed := time.Since(started)
+	if elapsed < 100*time.Millisecond || elapsed > 2*time.Second {
+		t.Fatalf("shutdown returned after %v, want a bounded wait of about 100ms", elapsed)
+	}
+	if names := mediaFileOps.runningNames(); len(names) != 1 || names[0] != "Stuck.Copy.mkv" {
+		t.Fatalf("shutdown gave up but the copy is no longer marked: %v", names)
+	}
+}
+
 func TestRetryStorageMovesHonoursBackoffAfterFailure(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "downloads")
