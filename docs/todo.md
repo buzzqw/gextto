@@ -39,6 +39,8 @@ features). 7 + 8 + 11 + 6 = 32 items.
 - **Gextto — archive and MediaInfo reads before the limit**: `MediaInfoBackfillTargets` loads every missing row before applying its limit, content filters with an empty query scan the whole archive, `BrowsePage` parses every row. Gate: paginated queries and a light list DTO, measured on 100k archive rows.
 - **Gextto — single series and calendar doing global work**: `EpisodesForSeries` decodes every active torrent and filters in Go, and the ICS calendar holds its cache lock across network calls. Gate: per-series SQL predicates and a calendar built outside the lock.
 - **Gextto — logger and acquisition history writes**: the logger holds its lock across the disk write and every acquisition event is its own SQLite transaction. Gate: a blocking-writer test and batched event commits.
+- **Benchmark — the 4 GiB recheck against the previous build**: the gx-only round measured a recheck about 9 % slower than the previous one (3.5 s against 3.2 s, median of three, disk-bound), the only figure outside its earlier range. Gate: alternate the two builds on `check-upload` and replace the figure only if the gap repeats.
+- **Benchmark — refresh the whole client table**: the other clients' images, the kernel and Docker have moved on since the published full round, so a round of gx-torrent alone can no longer replace its rows in `docs/measurements.md`. Gate: a quiet night with the media server's library scan out of the small hours, a full round of every client, and every table replaced.
 - **Persistence — transactions**: replace the remaining whole-library read-modify-write paths with patch transactions or revisions. Gate: concurrent save tests beyond the series/movie endpoints.
 
 ## Plan
