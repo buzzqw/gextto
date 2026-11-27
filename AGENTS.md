@@ -313,7 +313,9 @@ not to break.
   - *Bounded time*: a full round (every client, every scenario, three rounds)
     stays within 150 minutes. The fixed waits are short (3 s quiet check, 10 s
     settle, 30 s at rest) and `--max-minutes` stops starting runs when the
-    budget is over; a client cut short shows fewer runs in the report.
+    budget is over; a client cut short shows fewer runs in the report. A round
+    stops early, too, when the host has not been quiet twice in a row: another
+    program owns the machine, and the round is started again once it is gone.
   - *Measure only what changed.* When only gx-torrent changed (the other clients'
     images and versions, the machine, the limits and the payloads are the same),
     re-run gx-torrent alone (`--clients gx-torrent`, every scenario, three rounds)

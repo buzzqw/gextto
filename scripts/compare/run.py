@@ -95,6 +95,11 @@ MIN_AVAILABLE_KIB = 1500 * 1024
 # run on a busy machine, whose numbers are thrown away.
 QUIET_CORES = float(os.environ.get("GX_COMPARE_QUIET_CORES", "1.0"))
 MAX_ATTEMPTS = 3
+# A host that never goes quiet is not measured: the run comes out disturbed and
+# the report throws it away. Two give-ups in a row mean that something else owns
+# the machine, so the round stops instead of waiting out its whole budget for
+# runs that would be discarded (see wait_quiet).
+MAX_QUIET_GIVEUPS = 2
 # The fixed waits of a run. A full round (six clients, six scenarios, three
 # rounds) must stay within ROUND_BUDGET_MIN: the waits are what can be cut, the
 # transfers are the measurement. The quiet check before a run is short because
@@ -734,6 +739,12 @@ def ffmpeg_running():
     return subprocess.run(["pgrep", "-x", "ffmpeg"], capture_output=True).returncode == 0
 
 
+def ffmpeg_owners():
+    """Who is decoding on the host, so the log says it instead of a bare count."""
+    owners = sh("pgrep", "-a", "-x", "ffmpeg", check=False)
+    return "; ".join(line[:120] for line in owners.splitlines()[:3])
+
+
 FFMPEG_SEEN = threading.Event()
 
 
@@ -752,6 +763,9 @@ def guard_host():
 
 def wait_quiet(limit=1200):
     """Wait for the rest of the host to use less than QUIET_CORES, for 10 s in a row."""
+    owners = ffmpeg_owners()
+    if owners:
+        log(f"ffmpeg is running on the host, so every run is marked disturbed: {owners}")
     started = time.time()
     while time.time() - started < limit:
         guard_host()
@@ -1218,6 +1232,7 @@ def disturbed(record):
 def run_rounds(args, clients, scenarios, env, commit):
     threading.Thread(target=watch_ffmpeg, daemon=True).start()
     failures = 0
+    giveups = 0
     # The budget is a hard stop: a run is not started once it has run out, and
     # the report shows the clients with fewer runs.
     deadline = time.time() + args.max_minutes * 60 if args.max_minutes > 0 else None
@@ -1234,6 +1249,14 @@ def run_rounds(args, clients, scenarios, env, commit):
                         log(f"the {args.max_minutes:g}-minute budget is over: no more runs")
                         return failures + 1
                     quiet = wait_quiet()
+                    if quiet < 0:
+                        giveups += 1
+                        if giveups >= MAX_QUIET_GIVEUPS:
+                            log(f"the rest of the host has not been quiet {giveups} times in a row: "
+                                "stopping the round, fix what is running and start it again")
+                            return failures + 1
+                    else:
+                        giveups = 0
                     FFMPEG_SEEN.clear()
                     log(f"round {round_no + 1}/{args.rounds} {scenario} {client} (host {quiet:.2f} cores)")
                     record = {

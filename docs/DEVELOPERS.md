@@ -439,7 +439,11 @@ removes those too). The only files that stay are the raw benchmark results in
 `gextto-data/bench/`, which the next run overwrites. The unattended comparison
 is `scripts/compare/nightly.sh`: it waits for five quiet minutes, smoke-tests
 the clients it does not trust yet, measures HEAD in a temporary worktree when
-the checkout has uncommitted changes, and writes the tables. The anacrolix row
+the checkout has uncommitted changes, and writes the tables. `scripts/nightly-benchmarks.sh`
+is the nightly pass that runs the Go benchmarks in the same night (`--go-only`,
+`--compare-only`, `--clients`, `--rounds`); both refuse a host where another
+program is decoding, because its ffmpeg marks every comparison run disturbed and
+the run is thrown away. The anacrolix row
 is driven by `scripts/compare/anacrolix`, a small HTTP front end over the
 library. Docker's build cache is not
 part of the work area: `docker builder prune` after a round that rebuilt the

@@ -273,7 +273,11 @@ and test*: same torrents (generated from a fixed formula, info hashes pinned in
 quiet host, three interleaved rounds. `scripts/compare/nightly.sh` is the unattended version:
 it waits for the machine to be quiet, smoke-tests the clients it does not trust yet, measures
 HEAD in a temporary worktree when the checkout has uncommitted changes, writes the tables and
-cleans up. Results are written to `gextto-data/bench/compare.jsonl`. Changing the machine, a
+cleans up. `scripts/nightly-benchmarks.sh` runs the Go benchmarks too, and a round of
+gx-torrent alone that replaces only its rows is `--compare-only --clients gx-torrent`. Both
+wait for a host without an ffmpeg of another program and stop the round when it stays busy:
+a run marked disturbed is not a figure, and waiting out the budget for it is a lost night.
+Results are written to `gextto-data/bench/compare.jsonl`. Changing the machine, a
 version, a limit or a payload starts a new baseline: run every client again and replace every
 table above.
 
