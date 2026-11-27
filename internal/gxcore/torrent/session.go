@@ -471,11 +471,21 @@ func (c *Session) advertiseExtensions() {
 // TrackerManager.Get instead and are trusted by that explicit action.
 func (s *Session) parseTrackers(tiers [][]string, private bool) []tracker.Tracker {
 	ret := make([]tracker.Tracker, 0, len(tiers))
+	refused, firstRefused := 0, ""
 	for _, tier := range tiers {
 		trackers := make([]tracker.Tracker, 0, len(tier))
 		for _, tr := range tier {
 			t, err := s.trackerManager.GetUntrusted(tr, s.config.TrackerHTTPTimeout, s.getTrackerUserAgent(private), int64(s.config.TrackerHTTPMaxResponseSize))
 			if err != nil {
+				// A tracker from metainfo may not point into the LAN. The skip is
+				// the operator's to see: without the line the torrent looks
+				// broken and nothing says why.
+				if errors.Is(err, netx.ErrPrivateAddress) {
+					if refused == 0 {
+						firstRefused = tr
+					}
+					refused++
+				}
 				continue
 			}
 			trackers = append(trackers, t)
@@ -484,6 +494,13 @@ func (s *Session) parseTrackers(tiers [][]string, private bool) []tracker.Tracke
 			tier := tracker.NewTier(trackers)
 			tier.SetAnnounceAll(s.config.AnnounceAllInTier)
 			ret = append(ret, tier)
+		}
+	}
+	if refused > 0 && s.log != nil {
+		if refused == 1 {
+			s.log.Warningf("tracker %s is skipped: it points to a private or local address, which a tracker coming from a torrent may not reach (allow it with -web-sources-allow-private)", firstRefused)
+		} else {
+			s.log.Warningf("%d trackers are skipped because they point to private or local addresses, which a tracker coming from a torrent may not reach (allow them with -web-sources-allow-private); the first is %s", refused, firstRefused)
 		}
 	}
 	return ret

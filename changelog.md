@@ -24,6 +24,9 @@ creazione, app sul telefono — valgono **soltanto per la versione standalone** 
 non cambiano l'interfaccia di Gextto, dove quelle pagine non esistono. Le
 correzioni al motore valgono invece per entrambi.
 
+## 27 novembre 2026
+- **Un tracker su un indirizzo privato non sparisce più in silenzio.** Un torrent può indicare un tracker che sta sulla rete di casa: per non toccare la LAN quel tracker viene saltato, ma prima nessuna riga lo diceva e il download sembrava semplicemente rotto. Ora il log avvisa, nomina il tracker e ricorda l'opzione che li ammette. **Cosa cambia per te:** se un download non parte per un tracker di casa, leggi il motivo e sai come rimediare.
+
 ## 26 novembre 2026
 - **Il log di un download completato dice ora qual è la cartella di download.** Il percorso mostrato subito dopo il completamento è quello dove il file si trova in quel momento — per esempio il RAM disk — e non la libreria: la riga ora lo dice esplicitamente e ricorda che il file si sposta in libreria quando il seed è finito. **Cosa cambia per te:** non si confonde più la cartella di download con quella della libreria.
 - **I percorsi con spazi o `%` non rompono più il servizio systemd.** L'installatore scriveva `ExecStart`, `WorkingDirectory` e le variabili d'ambiente così come arrivavano: una cartella dati con uno spazio spezzava il comando, e un `%` veniva letto da systemd come un segnaposto. Ora i valori sono quotati con le regole di systemd, l'unità viene controllata con `systemd-analyze verify` prima di essere abilitata e, se il nuovo programma non parte, l'installatore per utente rimette il binario precedente invece di lasciare il servizio fermo. **Cosa cambia per te:** puoi installare in una cartella con spazi nel nome, e un aggiornamento andato male non ti lascia senza servizio.

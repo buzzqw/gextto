@@ -1487,7 +1487,9 @@ example:
   URLs come from the torrent's data (even from an untrusted feed) and without
   this limit they could make the client contact the router, the NAS or other
   internal services (SSRF). Trackers added explicitly by the operator remain
-  trusted. The `.torrent` links of feed items, indexer searches and the feed
+  trusted, and a tracker skipped for this reason is named in a warning line of
+  the log with the option that would allow it, so a torrent that does not
+  download does not look broken without a reason. The `.torrent` links of feed items, indexer searches and the feed
   archive follow the same rule (standalone only): a link on the host of a
   configured feed or indexer is trusted (a Jackett or Prowlarr on the LAN links
   to itself), any other link may reach only public addresses, checked on the

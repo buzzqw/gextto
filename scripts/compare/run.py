@@ -486,6 +486,10 @@ class GxTorrent(QBitAPI):
             # The other clients fetch no tracker list or country database and
             # filter no client: neither does gx-torrent here.
             "-tracker-list=false", "-peer-country=false", "-client-filter=false",
+            # The round runs on an isolated network of 172.31.0.0/16: its tracker
+            # and its peers are private addresses by construction, and the guard
+            # that keeps a torrent's URLs off the LAN is what the flag lifts.
+            "-web-sources-allow-private",
             *extra,
         ]
 

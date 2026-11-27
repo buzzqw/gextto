@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 27 November 2026
+- **A tracker on a private address no longer disappears in silence.** A torrent can name a tracker that lives on your home network: to keep off the LAN that tracker is skipped, but nothing said so before and the download simply looked broken. The log now warns, names the tracker and points to the option that allows them. **What changes for you:** when a download does not start because of a tracker at home, you read the reason and know how to fix it.
+
 ## 26 November 2026
 - **The log of a finished download now says which folder it is.** The path shown right after completion is where the file is at that moment — the RAM disk, for example — not the library: the line now says so explicitly and reminds you that the file moves to the library once seeding is over. **What changes for you:** the download folder is no longer mistaken for the library folder.
 - **Paths with spaces or `%` no longer break the systemd service.** The installer wrote `ExecStart`, `WorkingDirectory` and the environment variables exactly as it received them: a data folder with a space split the command, and a `%` was read by systemd as a placeholder. The values are now quoted with systemd's rules, the unit is checked with `systemd-analyze verify` before it is enabled and, if the new program does not start, the user installer puts the previous binary back instead of leaving the service down. **What changes for you:** you can install into a folder with spaces in its name, and a failed update no longer leaves you without the service.
