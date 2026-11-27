@@ -3836,7 +3836,7 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 	// files while they are still being copied.
 	guard := AcquireArchiveImport(release.Series)
 	defer guard.Release()
-	processed, err := tevStagePackFiles(cfg, release, matching, source, destination, tmdb)
+	processed, err := tevStagePackFiles(cfg, event.Hash, release, matching, source, destination, tmdb)
 	if err != nil {
 		return false, err
 	}
@@ -3854,7 +3854,7 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 // tevStagePackFiles places each matching file of a pack in the library, or
 // discards it when the library already holds a better copy, and post-processes
 // the placed ones.
-func tevStagePackFiles(cfg *Config, release *models.Release, matching []PackSourceFile, source, destination string, tmdb *TmdbClient) ([]PackFileResult, error) {
+func tevStagePackFiles(cfg *Config, hash string, release *models.Release, matching []PackSourceFile, source, destination string, tmdb *TmdbClient) ([]PackFileResult, error) {
 	processed := []PackFileResult{}
 	// Enumerate each destination once and reuse it for every episode: each
 	// episode's "is there a better existing file?" check walks the directory,
@@ -3878,7 +3878,9 @@ func tevStagePackFiles(cfg *Config, release *models.Release, matching []PackSour
 				fileDestination = seasonDestination
 			}
 		}
+		endCopy := beginLibraryCopy(hash, filepath.Join(fileDestination, filepath.Base(file.Path)))
 		placed, ok, err := StagePackFile(&file, source, fileDestination, filesIn(fileDestination), cfg, release.Quality)
+		endCopy()
 		if err != nil {
 			return nil, err
 		}

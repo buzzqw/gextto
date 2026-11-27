@@ -445,7 +445,9 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 					fileDestination = seasonDestination
 				}
 			}
+			endCopy := beginLibraryCopy(hash, filepath.Join(fileDestination, filepath.Base(file.Path)))
 			placed, ok, err := StagePackFile(&file, source, fileDestination, filesIn(fileDestination), cfg, release.Quality)
+			endCopy()
 			if err != nil {
 				return false, err
 			}

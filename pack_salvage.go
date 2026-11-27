@@ -92,7 +92,9 @@ func tevSalvagePackEpisodes(cfg *Config, torrents TorrentSession, db *Database, 
 				fileDestination = seasonDestination
 			}
 		}
+		endCopy := beginLibraryCopy(torrent.Hash, filepath.Join(fileDestination, filepath.Base(file.Path)))
 		placed, ok, err := StagePackFile(&file, source, fileDestination, filesIn(fileDestination), cfg, release.Quality)
+		endCopy()
 		if err != nil {
 			logging.Warn("pack salvage: episode not imported", "hash", torrent.Hash, "file", filepath.Base(file.Path), "error", err)
 			continue
