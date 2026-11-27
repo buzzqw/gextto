@@ -890,6 +890,8 @@ fermato dopo il limite di seed — sta su **una riga sola**: nome, badge,
 dimensione, upload, peer, sciame e rapporto. La barra e la percentuale restano a
 chi sta scaricando o verificando i file, dove cambiano davvero; ↓ e il tempo
 stimato, che su un torrent fermo sono sempre zero, li trovi nella sua scheda.
+Anche con un nome lungo e la riga «Perché…» sotto, i valori restano sulla
+stessa riga: si accorcia il nome, non il rapporto.
 Lo **sciame** (🌐 seeder / leecher) è quello riportato da tracker e DHT:
 con **0 leecher** non c'è nessuno a cui caricare. Ordini con **Ordina per** (per
 tutta la lista insieme), filtri per nome e per tag, e scegli uno stato con i
@@ -905,6 +907,8 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
 | Stalled | nessun byte in più da troppo tempo; messo in pausa | aspettare il nuovo tentativo automatico |
 | In attesa di spazio | il disco della cartella di scarico è pieno: il motore mette in pausa i download finché lo spazio non torna | liberare spazio o cambiare cartella: il download riparte da solo, anche quelli in seed continuano |
 | Seeding | completato, sta condividendo | lasciarlo finire secondo i limiti di seed |
+| In pausa · limite seed | Gextto ha fermato la condivisione: il torrent ha raggiunto il limite di ratio, tempo o inattività | il file resta dove è; premi ▶ nella riga se vuoi continuare a condividerlo, oppure lascia che venga archiviato |
+| Spostamento | Gextto o il motore sta spostando i file in libreria | aspettare la fine dello spostamento |
 | Verifica file | il motore rilegge e verifica i pezzi già su disco | aspettare: la barra mostra l'avanzamento del controllo (pezzi verificati sul totale), non la percentuale dei dati |
 | Errore | il motore ha segnalato un errore | leggere il motivo prima di rimuoverlo |
 | Archiviato | il file è in libreria | nulla; non cancellare la sorgente mentre è in seed |

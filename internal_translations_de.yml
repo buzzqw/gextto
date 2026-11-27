@@ -1543,6 +1543,9 @@ deu:
   In errore: Fehler
   In pari: Sogar
   In pausa: In der Pause
+  In pausa · limite seed: Pause · Seed-Limit
+  Gextto ha fermato la condivisione perché il torrent ha raggiunto il limite di seed impostato (ratio, tempo o inattività). I file restano dove sono finché non lo riprendi o non viene archiviato.: Gextto hat das Seeding beendet, weil dieser Torrent das eingestellte Seed-Limit (Ratio, Zeit oder Inaktivität) erreicht hat. Die Dateien bleiben an ihrem Ort, bis du sie fortsetzt oder sie archiviert werden.
+  Spostamento: Wird verschoben
   In programmazione: Beim Programmieren
   In scarico: Entladung
   "Fermi a 0 B/s": "Bei 0 B/s blockiert"

@@ -890,8 +890,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
    below, because there they change. ↓ and the ETA are left out on a settled
    row: they are zero by definition, and the torrent drawer shows them. */
 .torrent-card.is-settled { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px 12px; }
-.torrent-card.is-settled > .torrent-head { flex: 1 1 auto; min-width: 0; }
-.torrent-card.is-settled > .torrent-body { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; margin: 0; }
+.torrent-card.is-settled > .torrent-head { flex: 1 1 0; min-width: 0; }
+/* The facts keep their full width: a settled row is one line, and a long name
+   with a «Perché» line under it must not push the last fact (the ratio) onto a
+   second one. The name truncates instead, like every other row. */
+.torrent-card.is-settled > .torrent-body { flex: 0 0 auto; min-width: 0; display: flex; align-items: center; margin: 0; }
 .torrent-card.is-settled > .torrent-state { flex: none; align-self: center; }
 .torrent-card.is-settled > .row-actions { flex: none; align-self: center; }
 /* The checkbox and the state badge stay at the top of the row like every other
@@ -903,7 +906,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-card.is-settled .torrent-name > .badge,
 .torrent-card.is-settled .torrent-name > .tag-chips { flex: none; }
 .torrent-card.is-settled .torrent-name .tag-chips { margin-top: 0; }
-.torrent-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.torrent-facts { display: flex; flex-wrap: nowrap; align-items: center; gap: 2px 8px; color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 .torrent-fact { white-space: nowrap; }
 /* The dot belongs to the value that follows it, so a line break never leaves a
    separator hanging at the end of a line. */

@@ -1549,6 +1549,9 @@ fra:
   In errore: En erreur
   In pari: Même
   In pausa: En pause
+  In pausa · limite seed: En pause · limite de seed
+  Gextto ha fermato la condivisione perché il torrent ha raggiunto il limite di seed impostato (ratio, tempo o inattività). I file restano dove sono finché non lo riprendi o non viene archiviato.: Gextto a arrêté le partage parce que ce torrent a atteint la limite de seed définie (ratio, temps ou inactivité). Les fichiers restent en place jusqu'à ce que vous le repreniez ou qu'il soit archivé.
+  Spostamento: Déplacement
   In programmazione: En programmation
   In scarico: Déchargement
   "Fermi a 0 B/s": "Bloqués à 0 B/s"

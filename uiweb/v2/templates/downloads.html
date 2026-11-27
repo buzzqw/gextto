@@ -251,7 +251,7 @@
                     <span class="torrent-metric" {{trTitle "Caricato diviso scaricato: sopra 1 hai condiviso più di quanto hai preso"}}><span class="sr-only">{{tr "Ratio"}}</span><span aria-hidden="true">⇅</span> {{tr (printf "%.2f" .Ratio)}}</span>
                   </div>
                 </div>{{end}}
-                {{if .Settled}}<span class="torrent-state badge {{.StateClass}}">{{tr .State}}</span>{{end}}
+                {{if .Settled}}<span class="torrent-state badge {{.StateClass}}"{{if .SeedLimitStop}} {{trTitle "Gextto ha fermato la condivisione perché il torrent ha raggiunto il limite di seed impostato (ratio, tempo o inattività). I file restano dove sono finché non lo riprendi o non viene archiviato."}}{{end}}>{{tr .State}}</span>{{end}}
                 <div class="row-actions">
                   {{if .Paused}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="resume:{{.Hash}}" {{trTitle "Riprende questo torrent dal punto in cui si era fermato"}} aria-label="{{tr "Riprendi"}}"><span aria-hidden="true">{{icon "i-play"}}</span></button>
                   {{else}}<button class="btn sm icon-action" type="submit" id="v2-pause-{{.Hash}}" name="row_action" value="pause:{{.Hash}}" {{trTitle "Mette in pausa questo torrent: i file restano dove sono"}} aria-label="{{tr "Pausa"}}"><span aria-hidden="true">{{icon "i-pause"}}</span></button>{{end}}

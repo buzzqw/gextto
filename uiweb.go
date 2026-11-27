@@ -208,6 +208,10 @@ type uiTorrentRow struct {
 	// every finished torrent say the same thing on every row and took two lines
 	// each. A download and a file check keep the bar, because there it moves.
 	Settled bool
+	// SeedLimitStop marks a torrent Gextto stopped because it reached a share
+	// limit (ratio, time or inactivity). The badge says so instead of leaving
+	// an unexplained "In pausa" on a torrent that has finished seeding.
+	SeedLimitStop bool
 	// Pinned marks the torrent forced out of the queue (the "📌 pin" badge);
 	// it is unpinned from its detail drawer.
 	Pinned bool
@@ -1001,7 +1005,25 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		// The badge describes the seed policy of the torrent, not its current
 		// state: a torrent set to seed forever shows it from the moment the
 		// limits are saved, while it still downloads too.
-		row.SeedInfinite = policy.limitsFor(seedViewForPolicy(view)).none()
+		limits := policy.limitsFor(seedViewForPolicy(view))
+		row.SeedInfinite = limits.none()
+		// A completed torrent stopped by the seed policy used to look exactly
+		// like one the operator paused by hand. Say which limit ended the seed,
+		// while keeping the state key: the filters and the play button still
+		// see a paused torrent.
+		if view.State == "paused" && row.Settled && !row.Archived && !view.DiskWait {
+			ratioReached := limits.ratioReached(&view)
+			timeReached := limits.timeReached(&view)
+			idleReached := seedIdle.reached(view.Hash)
+			reached := ratioReached || timeReached || idleReached
+			if cfg.Transfer.SeedLimitsAll {
+				reached = limits.allReached(&view, idleReached)
+			}
+			if reached {
+				row.SeedLimitStop = true
+				row.State = "In pausa · limite seed"
+			}
+		}
 		rows = append(rows, row)
 	}
 	// Default order in Scarico: alphabetical by name (case-insensitive), with

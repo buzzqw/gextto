@@ -872,6 +872,8 @@ seeding limit — takes **one line**: name, badges, size, upload, peers, swarm a
 ratio. The bar and the percentage stay with what is downloading or checking the
 files, where they do move; ↓ and the estimated time, always zero on a torrent at
 rest, are on its own page.
+Even with a long name and the "Why…" line beneath it, the figures stay on the
+same line: the name shortens, not the ratio.
 The **swarm** (🌐 seeders / leechers) is the one reported by trackers and DHT:
 with **0 leechers** there is nobody to upload to. Sort with **Sort by** (for the
 whole list at once), filter by name and by tag, and pick a state with the
@@ -887,6 +889,8 @@ the engine downloaded and uploaded since it started.
 | Stalled | no new bytes for too long; paused | wait for the automatic retry |
 | Waiting for disk space | the download folder's disk is full: the engine pauses the downloads until space returns | free some space or change folder: the download starts again by itself, and those seeding go on |
 | Seeding | complete, sharing | let it finish according to the seeding limits |
+| Paused · seed limit | Gextto stopped sharing: the torrent reached the ratio, time or inactivity limit | the file stays where it is; press ▶ on the row if you want to keep sharing it, or let it be archived |
+| Moving | Gextto or the engine is moving the files into the library | wait for the move to finish |
 | Checking | the engine re-reads and verifies the pieces already on disk | wait: the bar shows the check progress (verified pieces out of the total), not the data percentage |
 | Error | the engine reported an error | read the reason before removing it |
 | Archived | the file is in the library | nothing; do not delete the source while it seeds |

@@ -140,6 +140,85 @@ func TestDownloadsShowTheDiskGuardReason(t *testing.T) {
 	}
 }
 
+// The ratio is the last fact of a settled row: on desktop the facts keep their
+// width and stay on one line even when a long name carries a «Perché» line.
+func TestSettledRowFactsDoNotWrapOnDesktop(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, css := v2Request(t, server, http.MethodGet, "/static/gextto-ui.css", nil)
+	if code != http.StatusOK {
+		t.Fatalf("gextto-ui.css -> %d", code)
+	}
+	if !strings.Contains(css, ".torrent-card.is-settled > .torrent-body { flex: 0 0 auto;") {
+		t.Fatal("the settled row's facts still shrink when the name is long")
+	}
+	if !strings.Contains(css, ".torrent-facts { display: flex; flex-wrap: nowrap;") {
+		t.Fatal("the settled row's facts can still wrap onto a second line")
+	}
+}
+
+// A torrent Gextto stopped at the end of its seed does not look like one the
+// operator paused: the badge names the seed limit, while the state key and the
+// play button keep working as before.
+func TestDownloadsShowTheSeedLimitReason(t *testing.T) {
+	state := newTestAppState(t)
+	state.cfg.Transfer.SeedRatio = 0.1
+	state.cfg.Transfer.SeedTimeMinutes = 5
+	state.cfg.Transfer.SeedTimeDays = 0
+	state.cfg.Transfer.SeedLimitsAll = true
+	pinStateConfig(t, state)
+
+	stopped := "dddd000000000000000000000000000000000003"
+	manual := "dddd000000000000000000000000000000000004"
+	state.setActiveEngine(fakeProblemsEngine{list: []models.TorrentView{
+		{
+			Hash: stopped, Name: "Movie.2029.1080p.mkv", State: "paused",
+			Progress: 100, TotalSize: 100, TotalDone: 100,
+			AllTimeDownload: 100, AllTimeUpload: 20, SeedingSeconds: 600,
+			SeedRatio: -1, SeedDays: -1,
+		},
+		{
+			Hash: manual, Name: "Movie.2030.1080p.mkv", State: "paused",
+			Progress: 100, TotalSize: 100, TotalDone: 100,
+			SeedRatio: -1, SeedDays: -1,
+		},
+	}})
+
+	rows := uiTorrentRows(state)
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want 2", len(rows))
+	}
+	for _, row := range rows {
+		switch row.Hash {
+		case stopped:
+			if !row.SeedLimitStop || row.State != "In pausa · limite seed" {
+				t.Fatalf("seed-limit state = %q (flag %v), want the reason on the badge", row.State, row.SeedLimitStop)
+			}
+			if row.StateKey != "paused" || row.StateClass != "warn" {
+				t.Fatalf("state key/class = %q/%q, want paused/warn", row.StateKey, row.StateClass)
+			}
+		case manual:
+			if row.SeedLimitStop || row.State != "In pausa" {
+				t.Fatalf("a torrent with no limit reached = %q (flag %v), want In pausa", row.State, row.SeedLimitStop)
+			}
+		}
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads page -> %d", code)
+	}
+	if !strings.Contains(body, "In pausa · limite seed") {
+		t.Fatal("the downloads page does not name the seed-limit pause")
+	}
+	if !strings.Contains(body, "ha raggiunto il limite di seed impostato") {
+		t.Fatal("the seed-limit badge has no tooltip explaining the pause")
+	}
+}
+
 // uiTorrentSettled decides which rows lose the bar. A finished torrent says
 // "100 %" on every row of the list, while a file check has a bar worth
 // watching and a failed torrent must not look finished.
