@@ -361,6 +361,32 @@ test("il menu «⋯» di una riga non apre il dettaglio del torrent", async ({ p
   await expect(page.locator("#v2-detail-drawer")).toBeHidden();
 });
 
+test("la tabella peer si ordina cliccando le intestazioni", async ({ page }) => {
+  // The detail panel is fetched and replaced on every refresh: the sort must
+  // live in the page and toggle the direction on a second click.
+  const panel = `<table class="data-table" data-v2-peers-table><thead><tr>
+    <th scope="col"><button type="button" class="table-sort-button" data-v2-peer-sort data-col="0" aria-label="Ordina per Peer">Peer <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+    <th scope="col"><button type="button" class="table-sort-button" data-v2-peer-sort data-col="1" aria-label="Ordina per Download">↓ <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+    </tr></thead><tbody>
+      <tr><td>192.0.2.2:6881</td><td data-sort-value="100">100 kB/s</td></tr>
+      <tr><td>192.0.2.1:6881</td><td data-sort-value="900">900 kB/s</td></tr>
+    </tbody></table>`;
+  await page.goto("/?view=downloads");
+  await page.evaluate((html) => {
+    const drawer = document.getElementById("v2-detail-drawer");
+    drawer.hidden = false;
+    drawer.innerHTML = html;
+  }, panel);
+  const rows = page.locator("[data-v2-peers-table] tbody tr");
+  const speed = page.locator('[data-v2-peer-sort][data-col="1"]');
+  await speed.click();
+  await expect(rows.first()).toContainText("192.0.2.2:6881");
+  await expect(page.locator("[data-v2-peers-table] th").nth(1)).toHaveAttribute("aria-sort", "ascending");
+  await speed.click();
+  await expect(rows.first()).toContainText("192.0.2.1:6881");
+  await expect(page.locator("[data-v2-peers-table] th").nth(1)).toHaveAttribute("aria-sort", "descending");
+});
+
 test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 

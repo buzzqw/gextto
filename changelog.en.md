@@ -24,6 +24,7 @@ not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
 ## 27 November 2026
+- **The peer table's columns can be sorted.** In a torrent's detail tab, both in Gextto and on the standalone client's page, clicking a column header sorts the peers by that value: download or upload speed, progress, seed, connection, client or address. A second click reverses the direction, and the order stays in place when the list refreshes itself. **What changes for you:** the fastest peer or the one with the most pieces is right there, without scanning the list.
 - **A tracker on a private address no longer disappears in silence.** A torrent can name a tracker that lives on your home network: to keep off the LAN that tracker is skipped, but nothing said so before and the download simply looked broken. The log now warns, names the tracker and points to the option that allows them. **What changes for you:** when a download does not start because of a tracker at home, you read the reason and know how to fix it.
 
 ## 26 November 2026

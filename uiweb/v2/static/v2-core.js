@@ -481,6 +481,64 @@
     }
   }
 
+  // ----------------------------------------------- peer column sorting --
+  // The detail panel is replaced by HTMX on every refresh: the sort is kept
+  // here and re-applied after each swap, so refreshing does not reset it.
+  var v2PeerSort = { col: -1, dir: "asc" };
+
+  function sortValue(cell) {
+    if (!cell) return "";
+    var raw = cell.getAttribute("data-sort-value");
+    return raw !== null ? raw : (cell.textContent || "").trim();
+  }
+
+  function v2ApplyPeerSort(root) {
+    var table = root && root.matches && root.matches("[data-v2-peers-table]")
+      ? root : (root || document).querySelector("[data-v2-peers-table]");
+    if (!table || !table.tBodies.length) return;
+    var body = table.tBodies[0];
+    if (v2PeerSort.col >= 0) {
+      var rows = Array.prototype.slice.call(body.rows);
+      rows.sort(function (a, b) {
+        var x = sortValue(a.cells[v2PeerSort.col]);
+        var y = sortValue(b.cells[v2PeerSort.col]);
+        var nx = Number(x), ny = Number(y);
+        var cmp = x !== "" && y !== "" && !isNaN(nx) && !isNaN(ny)
+          ? nx - ny : String(x).localeCompare(String(y));
+        return v2PeerSort.dir === "desc" ? -cmp : cmp;
+      });
+      rows.forEach(function (row) { body.appendChild(row); });
+    }
+    table.querySelectorAll("[data-v2-peer-sort]").forEach(function (button) {
+      var active = Number(button.getAttribute("data-col")) === v2PeerSort.col;
+      var th = button.closest("th");
+      if (th) th.setAttribute("aria-sort", active
+        ? (v2PeerSort.dir === "desc" ? "descending" : "ascending") : "none");
+      var arrow = button.querySelector("[data-v2-peer-arrow]");
+      if (arrow) arrow.textContent = active ? (v2PeerSort.dir === "desc" ? "↓" : "↑") : "↕";
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest && event.target.closest("[data-v2-peer-sort]");
+    if (!button) return;
+    var col = Number(button.getAttribute("data-col"));
+    if (v2PeerSort.col === col) {
+      v2PeerSort.dir = v2PeerSort.dir === "asc" ? "desc" : "asc";
+    } else {
+      v2PeerSort.col = col;
+      v2PeerSort.dir = "asc";
+    }
+    v2ApplyPeerSort(button.closest("[data-v2-peers-table]") || document);
+  });
+
+  document.addEventListener("htmx:afterSwap", function (event) {
+    if (!event.target) return;
+    var panel = event.target.id === "v2-detail-panel" ? event.target
+      : (event.target.querySelector && event.target.querySelector("#v2-detail-panel"));
+    if (panel) v2ApplyPeerSort(panel);
+  });
+
   // ----------------------------------------------- torrent detail drawer --
   // The torrent detail opens as a bottom drawer (like gx-core) instead of a
   // centered modal, so the list stays visible while it is open. It is not

@@ -930,7 +930,9 @@ and the sheet scrolls inside itself. The tabs:
 | **Storage** | **Move storage** to another folder |
 | **History** | every event of that download, from the choice to the library |
 
-Hovering over a value or a button shows what it means. If you move the storage
+Hovering over a value or a button shows what it means. In the *Peers* tab, click
+a column header to sort the peers by that value: a second click reverses the
+direction and the order stays in place when the list refreshes itself. If you move the storage
 to a folder that **already holds the data**, Gextto rechecks and reuses it
 instead of downloading it again. Every save shows a notice at the top saying
 what was saved; if something fails the notice is red, gives the reason and the

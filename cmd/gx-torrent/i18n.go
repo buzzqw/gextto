@@ -367,6 +367,7 @@ var uiCatalog = map[string][5]string{
 	"Sort by connected peers":                  {"Ordina per peer connessi", "Nach verbundenen Peers sortieren", "Trier par pairs connectés", "Ordenar por pares conectados", "Sortuj według połączonych peerów"},
 	"Sort by download speed":                   {"Ordina per velocità di download", "Nach Download-Geschwindigkeit sortieren", "Trier par vitesse de téléchargement", "Ordenar por velocidad de descarga", "Sortuj według prędkości pobierania"},
 	"Sort by name":                             {"Ordina per nome", "Nach Name sortieren", "Trier par nom", "Ordenar por nombre", "Sortuj według nazwy"},
+	"Sort peers by this column":                {"Ordina i peer per questa colonna", "Peers nach dieser Spalte sortieren", "Trier les pairs par cette colonne", "Ordenar los pares por esta columna", "Sortuj peerów według tej kolumny"},
 	"Sort by progress":                         {"Ordina per avanzamento", "Nach Fortschritt sortieren", "Trier par progression", "Ordenar por progreso", "Sortuj według postępu"},
 	"Sort by share ratio":                      {"Ordina per rapporto di condivisione", "Nach Verhältnis sortieren", "Trier par ratio de partage", "Ordenar por ratio", "Sortuj według współczynnika"},
 	"Sort by size":                             {"Ordina per dimensione", "Nach Größe sortieren", "Trier par taille", "Ordenar por tamaño", "Sortuj według rozmiaru"},

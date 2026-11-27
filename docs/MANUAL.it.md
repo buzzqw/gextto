@@ -949,7 +949,10 @@ foglio scorre al suo interno. Le schede:
 | **Storage** | **Sposta storage** in un'altra cartella |
 | **Storia** | ogni evento di quel download, dalla scelta all'arrivo in libreria |
 
-Passando il mouse su un valore o su un pulsante compare la spiegazione. Se
+Passando il mouse su un valore o su un pulsante compare la spiegazione. Nella
+scheda *Peers* clicca l'intestazione di una colonna per ordinare i peer per quel
+valore: un secondo clic inverte la direzione e l'ordine resta attivo anche quando
+l'elenco si aggiorna da solo. Se
 sposti lo storage in una cartella che **contiene già i dati**, Gextto li
 ricontrolla e li riusa invece di riscaricarli. Ogni salvataggio mostra un
 avviso in alto che dice cosa è stato salvato; se qualcosa non riesce l'avviso è

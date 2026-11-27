@@ -1557,6 +1557,7 @@ function openDetail(hash,tab){
     if(!wasOpen){var sp=$('#dsplit');sp.setAttribute('aria-valuenow',Math.round(d.getBoundingClientRect().height));sp.setAttribute('aria-valuemin',120);sp.setAttribute('aria-valuemax',Math.max(160,window.innerHeight-200));}
     if(!wasOpen){var c=$('#drawer [data-close-drawer]');if(c)c.focus();}
     groupFiles();
+    applyPeersSort();
     drawTorrentGraph();
   });
 }
@@ -1625,6 +1626,44 @@ function groupFiles(){
     });
   });
 }
+// The peers table is rebuilt by openDetail on every refresh: keep the sort in
+// JS and re-apply it after each load. data-sort-value carries the raw numbers;
+// text cells sort on what the operator sees, in the interface language.
+var peersSort={col:-1,dir:'asc'};
+function peerSortValue(cell){
+  if(!cell)return '';
+  var raw=cell.getAttribute('data-sort-value');
+  return raw!==null?raw:(cell.textContent||'').trim();
+}
+function applyPeersSort(){
+  var table=$('#drawer table[data-peers-table]');if(!table||!table.tBodies.length)return;
+  var body=table.tBodies[0];
+  if(peersSort.col>=0){
+    var rows=Array.prototype.slice.call(body.rows);
+    rows.sort(function(a,b){
+      var x=peerSortValue(a.cells[peersSort.col]),y=peerSortValue(b.cells[peersSort.col]);
+      var nx=Number(x),ny=Number(y);
+      var cmp=(x!==''&&y!==''&&!isNaN(nx)&&!isNaN(ny))?nx-ny:String(x).localeCompare(String(y));
+      return peersSort.dir==='desc'?-cmp:cmp;
+    });
+    rows.forEach(function(r){body.appendChild(r);});
+  }
+  $$('[data-peer-sort]',table).forEach(function(btn){
+    var active=Number(btn.getAttribute('data-col'))===peersSort.col;
+    var th=btn.closest('th');
+    if(th)th.setAttribute('aria-sort',active?(peersSort.dir==='desc'?'descending':'ascending'):'none');
+    var arrow=btn.querySelector('.arrow');
+    if(arrow)arrow.textContent=active?(peersSort.dir==='desc'?'↓':'↑'):'↕';
+  });
+}
+document.addEventListener('click',function(e){
+  var btn=e.target.closest&&e.target.closest('[data-peer-sort]');
+  if(!btn)return;
+  var col=Number(btn.getAttribute('data-col'));
+  if(peersSort.col===col)peersSort.dir=peersSort.dir==='asc'?'desc':'asc';
+  else{peersSort.col=col;peersSort.dir='asc';}
+  applyPeersSort();
+});
 function closeDetail(){var d=$('#drawer');if(d.hidden)return;d.hidden=true;var h=state.drawer&&state.drawer.hash;state.drawer=null;var r=h&&rowByHash(h);if(r)r.focus();}
 function refreshDetail(){
   var s=state.drawer;if(!s||document.hidden)return;
@@ -2332,15 +2371,15 @@ window.gxClearFilters=function(){state.filter={status:'all',cat:null,tag:null,tr
   {{else}}<p class="muted">{{tr "Metadata not available yet."}}</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .Peers}}
-  <table class="tbl">
-    <thead><tr><th scope="col">{{tr "Peer"}}</th><th scope="col">{{tr "Client"}}</th><th scope="col" class="num">↓</th><th scope="col" class="num">↑</th><th scope="col" class="num">{{tr "Prog."}}</th><th scope="col">{{tr "Flag"}}</th><th scope="col" class="num">{{tr "For"}}</th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
+  <table class="tbl" data-peers-table>
+    <thead><tr><th scope="col"><button type="button" class="sort" data-peer-sort data-col="0" aria-label="{{tr "Sort peers by this column"}}: {{tr "Peer"}}" title="{{tr "Sort peers by this column"}}">{{tr "Peer"}} <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" class="sort" data-peer-sort data-col="1" aria-label="{{tr "Sort peers by this column"}}: {{tr "Client"}}" title="{{tr "Sort peers by this column"}}">{{tr "Client"}} <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col" class="num"><button type="button" class="sort" data-peer-sort data-col="2" aria-label="{{tr "Sort by download speed"}}" title="{{tr "Sort by download speed"}}">↓ <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col" class="num"><button type="button" class="sort" data-peer-sort data-col="3" aria-label="{{tr "Sort by upload speed"}}" title="{{tr "Sort by upload speed"}}">↑ <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col" class="num"><button type="button" class="sort" data-peer-sort data-col="4" aria-label="{{tr "Sort by progress"}}" title="{{tr "Sort by progress"}}">{{tr "Prog."}} <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" class="sort" data-peer-sort data-col="5" aria-label="{{tr "Sort peers by this column"}}: {{tr "Flag"}}" title="{{tr "Sort peers by this column"}}">{{tr "Flag"}} <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col" class="num"><button type="button" class="sort" data-peer-sort data-col="6" aria-label="{{tr "Sort peers by this column"}}: {{tr "For"}}" title="{{tr "Sort peers by this column"}}">{{tr "For"}} <span class="arrow" aria-hidden="true">↕</span></button></th><th scope="col"><span class="sr-only">{{tr "Actions"}}</span></th></tr></thead>
     <tbody>
     {{range .Peers}}
       <tr><td class="mono" title="{{.Source}}">{{.Address}}{{if .Country}} <span class="chip sm" title="{{tr "Country of the peer, from the offline country database"}}">{{.Country}}</span>{{end}}</td><td>{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
-      <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
-      <td class="num">{{printf "%.1f" .Progress}}%</td>
+      <td class="num" data-sort-value="{{.Down}}">{{rate .Down}}</td><td class="num" data-sort-value="{{.Up}}">{{rate .Up}}</td>
+      <td class="num" data-sort-value="{{.Progress}}">{{printf "%.1f" .Progress}}%</td>
       <td><div class="flags">{{if .Seed}}<span class="flag on">{{tr "seed"}}</span>{{end}}{{if .Incoming}}<span class="flag">{{tr "incoming"}}</span>{{else}}<span class="flag">{{tr "outgoing"}}</span>{{end}}{{if .UTP}}<span class="flag">{{tr "uTP"}}</span>{{else}}<span class="flag">{{tr "TCP"}}</span>{{end}}{{if .Encrypted}}<span class="flag on">{{tr "encrypted"}}</span>{{end}}{{if .Handshake}}<span class="flag on">{{tr "encrypted HS"}}</span>{{end}}{{if .Snubbed}}<span class="flag">{{tr "snubbed"}}</span>{{end}}{{if .Optimistic}}<span class="flag on">{{tr "optimistic"}}</span>{{end}}{{if .ClientChoke}}<span class="flag">{{tr "choking us"}}</span>{{end}}{{if .PeerChoke}}<span class="flag">{{tr "we choke"}}</span>{{end}}{{if .ClientInt}}<span class="flag">{{tr "interested"}}</span>{{end}}{{if .PeerInt}}<span class="flag">{{tr "interested in us"}}</span>{{end}}{{if .Downloading}}<span class="flag">{{tr "downloading"}}</span>{{end}}</div></td>
-      <td class="num">{{dur .Connected}}</td>
+      <td class="num" data-sort-value="{{.Connected}}">{{dur .Connected}}</td>
       <td><form method="post" action="/ui/peers" data-confirm-ban><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="peers"><input type="hidden" name="op" value="ban"><input type="hidden" name="peers" value="{{.Address}}"><button type="submit" class="ghost icon sm danger" aria-label="{{tr "Ban this peer"}}" title="{{tr "Ban this peer's IP address for 30 minutes"}}"><svg class="i"><use href="#i-ban"/></svg></button></form></td></tr>
     {{end}}
     </tbody>

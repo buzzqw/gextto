@@ -55,7 +55,23 @@
   {{else}}<p class="muted">{{tr "Nessun file."}}</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .TabError}}<p class="alert">{{tr .TabError}}</p>{{end}}
-  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">{{tr "Peer"}}</th><th scope="col">{{tr "Client"}}</th><th scope="col" {{trTitle "Velocità di download da questo peer."}}>↓</th><th scope="col" {{trTitle "Velocità di upload verso questo peer."}}>↑</th><th scope="col" {{trTitle "Percentuale del torrent che questo peer dichiara di avere."}}>{{tr "Progresso"}}</th><th scope="col" {{trTitle "Il peer ha già tutti i pezzi del torrent."}}>{{tr "Seed"}}</th><th scope="col" {{trTitle "Protocollo, cifratura e direzione della connessione"}}>{{tr "Connessione"}}</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{tr .Address}}{{if .Country}} <span class="badge" {{trTitle "Paese del peer, dal database dei paesi del motore"}}>{{tr .Country}}</span>{{end}}</td><td class="truncate">{{if .Client}}{{tr .Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}{{tr "sì"}}{{else}}{{tr "no"}}{{end}}</td><td>{{if .Utp}}{{tr "uTP"}}{{else}}{{tr "TCP"}}{{end}}{{if .Encrypted}}<span> {{tr "· cifrata"}}</span>{{end}}<span>{{if .Incoming}} {{tr "· in entrata"}}{{else}} {{tr "· in uscita"}}{{end}}</span></td></tr>{{end}}</tbody></table></div>
+  {{if .Peers}}<div class="table-wrap"><table class="data-table" data-v2-peers-table><thead><tr>
+      <th scope="col"><button type="button" class="table-sort-button" data-v2-peer-sort data-col="0" aria-label="{{tr "Ordina per"}} {{tr "Peer"}}" {{trTitle "Ordina i peer per questa colonna"}}>{{tr "Peer"}} <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+      <th scope="col"><button type="button" class="table-sort-button" data-v2-peer-sort data-col="1" aria-label="{{tr "Ordina per"}} {{tr "Client"}}" {{trTitle "Ordina i peer per questa colonna"}}>{{tr "Client"}} <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+      <th scope="col" {{trTitle "Velocità di download da questo peer."}}><button type="button" class="table-sort-button" data-v2-peer-sort data-col="2" aria-label="{{tr "Ordina per"}} {{tr "Download"}}" {{trTitle "Ordina i peer per questa colonna"}}>↓ <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+      <th scope="col" {{trTitle "Velocità di upload verso questo peer."}}><button type="button" class="table-sort-button" data-v2-peer-sort data-col="3" aria-label="{{tr "Ordina per"}} {{tr "Upload"}}" {{trTitle "Ordina i peer per questa colonna"}}>↑ <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+      <th scope="col" {{trTitle "Percentuale del torrent che questo peer dichiara di avere."}}><button type="button" class="table-sort-button" data-v2-peer-sort data-col="4" aria-label="{{tr "Ordina per"}} {{tr "Progresso"}}" {{trTitle "Ordina i peer per questa colonna"}}>{{tr "Progresso"}} <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+      <th scope="col" {{trTitle "Il peer ha già tutti i pezzi del torrent."}}><button type="button" class="table-sort-button" data-v2-peer-sort data-col="5" aria-label="{{tr "Ordina per"}} {{tr "Seed"}}" {{trTitle "Ordina i peer per questa colonna"}}>{{tr "Seed"}} <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+      <th scope="col" {{trTitle "Protocollo, cifratura e direzione della connessione"}}><button type="button" class="table-sort-button" data-v2-peer-sort data-col="6" aria-label="{{tr "Ordina per"}} {{tr "Connessione"}}" {{trTitle "Ordina i peer per questa colonna"}}>{{tr "Connessione"}} <span data-v2-peer-arrow aria-hidden="true">↕</span></button></th>
+    </tr></thead><tbody>{{range .Peers}}<tr>
+      <td>{{tr .Address}}{{if .Country}} <span class="badge" {{trTitle "Paese del peer, dal database dei paesi del motore"}}>{{tr .Country}}</span>{{end}}</td>
+      <td class="truncate">{{if .Client}}{{tr .Client}}{{else}}—{{end}}</td>
+      <td data-sort-value="{{.DownloadRate}}">{{rate .DownloadRate}}</td>
+      <td data-sort-value="{{.UploadRate}}">{{rate .UploadRate}}</td>
+      <td data-sort-value="{{.Progress}}">{{printf "%.1f" .Progress}}%</td>
+      <td data-sort-value="{{if .Seed}}1{{else}}0{{end}}">{{if .Seed}}{{tr "sì"}}{{else}}{{tr "no"}}{{end}}</td>
+      <td>{{if .Utp}}{{tr "uTP"}}{{else}}{{tr "TCP"}}{{end}}{{if .Encrypted}}<span> {{tr "· cifrata"}}</span>{{end}}<span>{{if .Incoming}} {{tr "· in entrata"}}{{else}} {{tr "· in uscita"}}{{end}}</span></td>
+    </tr>{{end}}</tbody></table></div>
   {{if .PeerCountries}}<p class="hint">{{tr "Paesi:"}} <a href="https://db-ip.com" target="_blank" rel="noopener noreferrer">{{tr "IP Geolocation by DB-IP"}}</a></p>{{end}}
   {{else}}<p class="muted">{{tr "Nessun peer connesso."}}</p>{{end}}
 {{else if eq .Tab "pieces"}}

@@ -202,6 +202,10 @@ endonyms, six of them, plus the language packs loaded from `<data>/lang`): the
 choice is written to `settings.json` like the settings page's field and the
 page is reloaded already translated.
 
+The torrent details' **Peers** tab sorts by any column when its header is
+clicked: a second click reverses the order, and the choice survives the
+two-second refresh of the page.
+
 The built-in page can be replaced by an **alternative web interface**
 (*Settings → Web interface*): the daemon downloads the latest **VueTorrent**
 release from GitHub into `<data>/vuetorrent` and serves it at the root address;
