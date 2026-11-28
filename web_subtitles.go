@@ -10,28 +10,31 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	subtitleprovider "github.com/buzzqw/gextto/internal/subtitles"
 )
 
 type subtitleSettingsInput struct {
-	Enabled     any    `json:"enabled"`
-	ProviderURL string `json:"provider_url"`
-	APIKey      string `json:"api_key"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	Forced      string `json:"forced"`
-	SDH         string `json:"sdh"`
-	Collision   string `json:"collision_policy"`
+	Enabled      any    `json:"enabled"`
+	ProviderKind string `json:"provider_kind"`
+	ProviderURL  string `json:"provider_url"`
+	APIKey       string `json:"api_key"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	Forced       string `json:"forced"`
+	SDH          string `json:"sdh"`
+	Collision    string `json:"collision_policy"`
 }
 
 func subtitleSettingsValues(cfg *Config, input subtitleSettingsInput) (map[string]string, error) {
 	values := map[string]string{
-		subtitleSettingEnabled:     strconv.FormatBool(settingTruthy(fmt.Sprint(input.Enabled))),
-		subtitleSettingProviderURL: strings.TrimSpace(input.ProviderURL),
-		subtitleSettingUsername:    strings.TrimSpace(input.Username),
-		subtitleSettingForced:      strings.ToLower(strings.TrimSpace(input.Forced)),
-		subtitleSettingSDH:         strings.ToLower(strings.TrimSpace(input.SDH)),
-		subtitleSettingCollision:   strings.ToLower(strings.TrimSpace(input.Collision)),
+		subtitleSettingEnabled:      strconv.FormatBool(settingTruthy(fmt.Sprint(input.Enabled))),
+		subtitleSettingProviderKind: subtitleProviderKind(input.ProviderKind),
+		subtitleSettingProviderURL:  strings.TrimSpace(input.ProviderURL),
+		subtitleSettingUsername:     strings.TrimSpace(input.Username),
+		subtitleSettingForced:       strings.ToLower(strings.TrimSpace(input.Forced)),
+		subtitleSettingSDH:          strings.ToLower(strings.TrimSpace(input.SDH)),
+		subtitleSettingCollision:    strings.ToLower(strings.TrimSpace(input.Collision)),
 	}
 	if values[subtitleSettingProviderURL] == "" {
 		values[subtitleSettingProviderURL] = subtitleprovider.DefaultBaseURL
@@ -70,7 +73,7 @@ func subtitleSettingsValues(cfg *Config, input subtitleSettingsInput) (map[strin
 	if password == "" {
 		password = cfg.Settings[subtitleSettingPassword]
 	}
-	if settingTruthy(values[subtitleSettingEnabled]) && apiKey == "" {
+	if settingTruthy(values[subtitleSettingEnabled]) && values[subtitleSettingProviderKind] == "com" && apiKey == "" {
 		return nil, errors.New("subtitle provider API key is required when subtitles are enabled")
 	}
 	if (values[subtitleSettingUsername] == "") != (strings.TrimSpace(password) == "") {
@@ -136,7 +139,7 @@ func SubtitleSettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 func SubtitleSettingsView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	prefs := subtitlePreferencesFrom(latestConfig(s))
 	jsonResponse(w, map[string]any{
-		"enabled": prefs.Enabled, "provider_url": prefs.ProviderURL,
+		"enabled": prefs.Enabled, "provider_kind": prefs.Kind, "provider_url": prefs.ProviderURL,
 		"username": prefs.Username,
 		"forced":   prefs.Forced, "sdh": prefs.SDH, "collision_policy": prefs.Collision,
 		"api_key_configured": prefs.APIKey != "", "password_configured": prefs.Password != "",
@@ -191,6 +194,7 @@ func SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		target, err = resolveSubtitleTarget(r.Context(), cfg, s.db, series, season, episode, movieID)
 	}
 	if err != nil {
+		logging.Warn("Subtitle search could not identify the video", "error", err.Error())
 		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -207,14 +211,21 @@ func SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 	}
+	logging.Info("Looking for subtitles for a video", "title", target.Label, "languages", subtitleSearchLogLanguages(languages))
 	candidates, err := searchSubtitleCandidatesForLanguages(r.Context(), cfg, s.db, target, languages)
 	if err != nil {
+		logging.Warn("Subtitle search failed", "title", target.Label, "error", err.Error())
 		status := http.StatusBadGateway
 		if strings.Contains(err.Error(), "disabled") {
 			status = http.StatusConflict
 		}
 		jsonError(w, status, err.Error())
 		return
+	}
+	if len(candidates) == 0 {
+		logging.Info("No subtitles found for a video", "title", target.Label, "languages", subtitleSearchLogLanguages(languages))
+	} else {
+		logging.Info(fmt.Sprintf("Found %d subtitles for a video", len(candidates)), "title", target.Label, "languages", subtitleSearchLogLanguages(languages))
 	}
 	jsonResponse(w, subtitleSearchResponse{Target: target, Candidates: candidates})
 }
@@ -261,4 +272,11 @@ func SubtitleApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	jsonResponse(w, map[string]any{"ok": true, "path": path})
+}
+
+func subtitleSearchLogLanguages(languages []string) string {
+	if len(languages) == 0 {
+		return "all languages"
+	}
+	return strings.Join(languages, ", ")
 }

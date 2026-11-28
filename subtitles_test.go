@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/models"
+	subtitleprovider "github.com/buzzqw/gextto/internal/subtitles"
 )
 
 func subtitleTestVideo(t *testing.T) string {
@@ -146,6 +147,31 @@ func TestValidateSubtitleSRTRejectsInvalidUTF8AfterBOM(t *testing.T) {
 	}
 }
 
+func TestSubtitleSettingsAllowLegacyProviderWithoutAPIKey(t *testing.T) {
+	state := newTestAppState(t)
+	cfg := latestConfig(state)
+	if err := saveSubtitleSettings(cfg, subtitleSettingsInput{
+		Enabled: "true", ProviderKind: "org", ProviderURL: "https://api.opensubtitles.com/api/v1",
+		Forced: "any", SDH: "any", Collision: "keep",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg = latestConfig(state)
+	if got := subtitlePreferencesFrom(cfg).Kind; got != "org" {
+		t.Fatalf("provider kind = %q, want org", got)
+	}
+	client, prefs, err := subtitleProviderClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prefs.Kind != "org" {
+		t.Fatalf("preferences = %+v", prefs)
+	}
+	if _, ok := client.(*subtitleprovider.LegacyClient); !ok {
+		t.Fatalf("provider client = %T, want the OpenSubtitles.org client", client)
+	}
+}
+
 func TestSubtitleSettingsKeepBlankSecretsAndValidatePair(t *testing.T) {
 	state := newTestAppState(t)
 	cfg := latestConfig(state)
@@ -177,8 +203,8 @@ func TestV2SubtitleSettingsUseSelectAndVisibleHelp(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("integrations -> %d", code)
 	}
-	if !strings.Contains(page, `<select class="input" name="enabled">`) {
-		t.Fatalf("enabled is not a select")
+	if !strings.Contains(page, `<select class="input" name="enabled">`) || !strings.Contains(page, `name="provider_kind"`) {
+		t.Fatalf("enabled/provider engine is not a select")
 	}
 	if !strings.Contains(page, `Mostra la ricerca dei sottotitoli su episodi, film e dettagli dei torrent.`) {
 		t.Fatalf("field help is not visible")
@@ -198,6 +224,28 @@ func TestV2SubtitleSettingsUseSelectAndVisibleHelp(t *testing.T) {
 	_, page = v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
 	if !strings.Contains(page, `<option value="yes" selected>`) || !strings.Contains(page, `<option value="replace" selected>`) {
 		t.Fatalf("stored select values are not selected")
+	}
+}
+
+func TestV2SubtitleSettingsSwitchToLegacyWithoutAPIKey(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveSetting(state.cfg.DataDir, "dry_run", "no"); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	defer server.Close()
+	code, body := v2Request(t, server, http.MethodPost, "/section/form", url.Values{
+		"view": {"integrations"}, "path": {"/api/subtitles/settings"},
+		"enabled": {"true"}, "_v2_kind_enabled": {"select"},
+		"provider_kind": {"org"}, "provider_url": {"https://api.opensubtitles.com/api/v1"},
+		"forced": {"any"}, "sdh": {"any"}, "collision_policy": {"keep"},
+	})
+	if code != http.StatusNoContent {
+		t.Fatalf("legacy settings form -> %d: %s", code, body)
+	}
+	prefs := subtitlePreferencesFrom(latestConfig(state))
+	if prefs.Kind != "org" || !prefs.Enabled {
+		t.Fatalf("legacy preferences = %+v", prefs)
 	}
 }
 

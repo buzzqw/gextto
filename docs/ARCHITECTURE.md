@@ -209,7 +209,7 @@ qBittorrent-nox.
 | `web_qbit.go` | the qBittorrent Web API subset (`/api/v2`) the browser extensions speak: login with the `SID` cookie, add of magnets and `.torrent` files, list, pause/resume, delete and recheck, all forwarded to the active engine. |
 | `library_bulk.go` | *Edit selected* of the Series and Movies tables: the same values on many titles, with a quality profile as a template. |
 | `web_torrent_events.go` | event machine of the torrent lifecycle. |
-| `subtitles.go`, `subtitles_torrent.go`, `web_subtitles.go`, `internal/subtitles/` | external subtitle targets, active-torrent file resolution, provider client, matching/reputation score and the search/apply HTTP surface. |
+| `subtitles.go`, `subtitles_torrent.go`, `web_subtitles.go`, `internal/subtitles/` | external subtitle targets, active-torrent file resolution, the OpenSubtitles.com REST and OpenSubtitles.org XML-RPC clients, matching/reputation score and the search/apply HTTP surface. |
 | `web_background.go` | long-running background workers. |
 | `web_workers_media.go` | media workers: scheduled backup, MediaInfo backfill, calendar. |
 | `web_maintenance_rename.go` | folder rename with user review. |

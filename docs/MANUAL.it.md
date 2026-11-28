@@ -1774,11 +1774,15 @@ Gextto non cancella mai file sorgente da solo.
 
 ### Sottotitoli esterni
 
-In *Integrazioni → Sottotitoli* puoi configurare un provider OpenSubtitles-
-compatibile con API key; account e password sono facoltativi, e forced e SDH
-hanno filtri separati. **Test connessione** verifica API key e accesso al
-provider con i valori scritti nel modulo, senza salvarli: la ricerca di prova
-non scarica sottotitoli.
+In *Integrazioni → Sottotitoli* scegli il **motore sottotitoli**:
+**OpenSubtitles.com** usa l'API REST e richiede la chiave API, mentre
+**OpenSubtitles.org** usa l'API legacy, non richiede chiave e accetta anche
+l'accesso anonimo; se le credenziali configurate non sono valide su quel
+servizio, ripiega da solo sull'accesso anonimo. Con OpenSubtitles.org l'URL
+dell'API REST viene ignorato;
+account e password restano facoltativi, e forced e SDH hanno filtri separati.
+**Test connessione** verifica il motore scelto con i valori scritti nel modulo,
+senza salvarli: la ricerca di prova non scarica sottotitoli.
 
 Le lingue si scelgono su ogni serie o film, nel campo *Sottotitoli*: se lo
 compili, Gextto cerca quei sottotitoli a ogni ciclo e scrive un `.srt` accanto
@@ -1801,7 +1805,9 @@ questi segnali e indica un **Consigliato per lingua**; non è una misura della
 qualità tecnica del sottotitolo. Se il file non è ancora completo, la ricerca usa
 identità e somiglianza dei nomi, senza presentare come definitivi hash o
 dimensione finali. Un file che contiene più episodi viene rifiutato finché non
-scegli una puntata univoca.
+scegli una puntata univoca. Ogni ricerca manuale lascia nel log il titolo, la
+lingua richiesta e quanti risultati ha trovato; una ricerca fallita riporta il
+motivo.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
 un'anteprima con lingua, release, motivo della corrispondenza e nome del file

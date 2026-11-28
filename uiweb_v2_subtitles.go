@@ -107,7 +107,7 @@ type v2SubtitleTestView struct {
 
 func subtitleSettingsInputFromForm(r *http.Request) subtitleSettingsInput {
 	return subtitleSettingsInput{
-		Enabled: r.FormValue("enabled"), ProviderURL: r.FormValue("provider_url"),
+		Enabled: r.FormValue("enabled"), ProviderKind: r.FormValue("provider_kind"), ProviderURL: r.FormValue("provider_url"),
 		APIKey: r.FormValue("api_key"), Username: r.FormValue("username"), Password: r.FormValue("password"),
 		Forced: r.FormValue("forced"), SDH: r.FormValue("sdh"),
 		Collision: r.FormValue("collision_policy"),

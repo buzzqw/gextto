@@ -20,14 +20,15 @@ import (
 )
 
 const (
-	subtitleSettingEnabled     = "subtitles_enabled"
-	subtitleSettingProviderURL = "subtitles_provider_url"
-	subtitleSettingAPIKey      = "subtitles_provider_api_key"
-	subtitleSettingUsername    = "subtitles_provider_username"
-	subtitleSettingPassword    = "subtitles_provider_password"
-	subtitleSettingForced      = "subtitles_forced"
-	subtitleSettingSDH         = "subtitles_sdh"
-	subtitleSettingCollision   = "subtitles_collision_policy"
+	subtitleSettingEnabled      = "subtitles_enabled"
+	subtitleSettingProviderKind = "subtitles_provider_kind"
+	subtitleSettingProviderURL  = "subtitles_provider_url"
+	subtitleSettingAPIKey       = "subtitles_provider_api_key"
+	subtitleSettingUsername     = "subtitles_provider_username"
+	subtitleSettingPassword     = "subtitles_provider_password"
+	subtitleSettingForced       = "subtitles_forced"
+	subtitleSettingSDH          = "subtitles_sdh"
+	subtitleSettingCollision    = "subtitles_collision_policy"
 )
 
 var errSubtitleCollision = errors.New("subtitle already exists")
@@ -39,16 +40,25 @@ var subtitleWriteMu sync.Mutex
 
 type subtitlePreferences struct {
 	Enabled                                 bool
+	Kind                                    string
 	ProviderURL, APIKey, Username, Password string
 	Forced, SDH, Collision                  string
 }
 
+func subtitleProviderKind(raw string) string {
+	if strings.EqualFold(strings.TrimSpace(raw), "org") {
+		return "org"
+	}
+	return "com"
+}
+
 func subtitlePreferencesFrom(cfg *Config) subtitlePreferences {
 	if cfg == nil {
-		return subtitlePreferences{ProviderURL: subtitleprovider.DefaultBaseURL, Forced: "any", SDH: "any", Collision: "keep"}
+		return subtitlePreferences{Kind: "com", ProviderURL: subtitleprovider.DefaultBaseURL, Forced: "any", SDH: "any", Collision: "keep"}
 	}
 	prefs := subtitlePreferences{
 		Enabled:     settingTruthy(cfg.Settings[subtitleSettingEnabled]),
+		Kind:        subtitleProviderKind(settingsOr(cfg, subtitleSettingProviderKind, "com")),
 		ProviderURL: settingsOr(cfg, subtitleSettingProviderURL, subtitleprovider.DefaultBaseURL),
 		APIKey:      strings.TrimSpace(cfg.Settings[subtitleSettingAPIKey]),
 		Username:    strings.TrimSpace(cfg.Settings[subtitleSettingUsername]),
@@ -92,15 +102,30 @@ func subtitleLanguagesFor(cfg *Config, target subtitleTarget) []string {
 	return languages
 }
 
-func subtitleProviderClient(cfg *Config) (*subtitleprovider.Client, subtitlePreferences, error) {
+type subtitleProviderAPI interface {
+	Search(context.Context, subtitleprovider.SearchQuery) ([]subtitleprovider.Subtitle, error)
+	Download(context.Context, int64, string) (subtitleprovider.Download, error)
+}
+
+func subtitleProviderClient(cfg *Config) (subtitleProviderAPI, subtitlePreferences, error) {
 	prefs := subtitlePreferencesFrom(cfg)
 	if !prefs.Enabled {
 		return nil, prefs, errors.New("subtitles are disabled")
 	}
-	client, err := subtitleprovider.New(subtitleprovider.Config{
-		BaseURL: prefs.ProviderURL, APIKey: prefs.APIKey, Username: prefs.Username, Password: prefs.Password,
+	providerConfig := subtitleprovider.Config{
+		Username: prefs.Username, Password: prefs.Password,
 		UserAgent: "gexttod/" + constants.AppVersion(),
-	})
+	}
+	var client subtitleProviderAPI
+	var err error
+	if prefs.Kind == "org" {
+		providerConfig.BaseURL = subtitleprovider.DefaultLegacyBaseURL
+		client, err = subtitleprovider.NewLegacy(providerConfig)
+	} else {
+		providerConfig.BaseURL = prefs.ProviderURL
+		providerConfig.APIKey = prefs.APIKey
+		client, err = subtitleprovider.New(providerConfig)
+	}
 	if err != nil {
 		return nil, prefs, err
 	}
@@ -300,6 +325,7 @@ type subtitleCandidate struct {
 	AITranslated      *bool    `json:"ai_translated,omitempty"`
 	MachineTranslated *bool    `json:"machine_translated,omitempty"`
 	DownloadCount     int      `json:"download_count"`
+	FPS               float64  `json:"fps,omitempty"`
 	ReleaseSimilarity int      `json:"release_similarity"`
 	Score             int      `json:"score"`
 	Recommended       bool     `json:"recommended"`
@@ -464,14 +490,14 @@ func subtitleEpisodeNumber(value int64) int {
 // searchSubtitleCandidatesWith is searchSubtitleCandidates with a client the
 // caller already holds: the automatic pass shares one client, and so one
 // provider login, across all its searches and downloads.
-func searchSubtitleCandidatesWith(ctx context.Context, client *subtitleprovider.Client, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget) ([]subtitleCandidate, error) {
+func searchSubtitleCandidatesWith(ctx context.Context, client subtitleProviderAPI, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget) ([]subtitleCandidate, error) {
 	return searchSubtitleCandidatesWithLanguages(ctx, client, prefs, cfg, db, target, subtitleLanguagesFor(cfg, target))
 }
 
 // searchSubtitleCandidatesWithLanguages accepts nil to browse every provider
 // language. The automatic pass and the archived-title modal keep their title
 // preference; the active-torrent browser uses nil unless a language is chosen.
-func searchSubtitleCandidatesWithLanguages(ctx context.Context, client *subtitleprovider.Client, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget, languages []string) ([]subtitleCandidate, error) {
+func searchSubtitleCandidatesWithLanguages(ctx context.Context, client subtitleProviderAPI, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget, languages []string) ([]subtitleCandidate, error) {
 	kind := "episode"
 	if target.Kind == "movie" {
 		kind = "movie"
@@ -543,7 +569,7 @@ func searchSubtitleCandidatesWithLanguages(ctx context.Context, client *subtitle
 			FileID: int64(file.ID), Language: language, Release: result.Release(), HashMatch: result.HashMatch,
 			SizeMatch: result.SizeMatch, ExternalIDMatch: result.IMDbMatch, Forced: forced, SDH: sdh,
 			FromTrusted: result.FromTrusted, AITranslated: result.AITranslated, MachineTranslated: result.MachineTranslated,
-			DownloadCount: result.DownloadCount, ReleaseSimilarity: similarity, ProposedName: name, Reasons: reasons,
+			DownloadCount: result.DownloadCount, FPS: result.FPS, ReleaseSimilarity: similarity, ProposedName: name, Reasons: reasons,
 		}
 		candidate.Score = subtitleCandidateScore(candidate)
 		candidates = append(candidates, candidate)
@@ -605,7 +631,7 @@ func applySubtitle(ctx context.Context, cfg *Config, db *Database, target subtit
 }
 
 // applySubtitleWith is applySubtitle with a client the caller already holds.
-func applySubtitleWith(ctx context.Context, client *subtitleprovider.Client, cfg *Config, target subtitleTarget, fileID int64, language string, forced, sdh, replace bool) (string, error) {
+func applySubtitleWith(ctx context.Context, client subtitleProviderAPI, cfg *Config, target subtitleTarget, fileID int64, language string, forced, sdh, replace bool) (string, error) {
 	download, err := client.Download(ctx, fileID, "srt")
 	if err != nil {
 		return "", err

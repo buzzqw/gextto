@@ -115,9 +115,9 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/list-import/apply` | transactionally import selected list items; body carries source, items and options (quality_profile_id, series_root, season_subfolders, dry_run) |
 | POST | `/list-import/preview` | SSR/HTMX fragment for the Simkl list preview |
 | POST | `/list-import/apply` | SSR/HTMX fragment that applies the selected preview rows |
-| GET | `/api/subtitles/settings` | subtitle provider settings without secrets |
-| POST | `/api/subtitles/settings` | save subtitle provider settings; blank secrets keep the stored value |
-| POST | `/api/subtitles/test` | test the configured provider without downloading a subtitle |
+| GET | `/api/subtitles/settings` | subtitle provider settings without secrets; provider_kind is com or org |
+| POST | `/api/subtitles/settings` | save subtitle provider settings; provider_kind selects OpenSubtitles.com REST or OpenSubtitles.org legacy (no API key required); blank secrets keep the stored value |
+| POST | `/api/subtitles/test` | test the selected provider without downloading a subtitle |
 | GET | `/api/subtitles/search` | read-only subtitle preview for an archived episode (series, season, episode) or movie (movie_id), or an active torrent (torrent_hash, zero-based file_index); languages accepts comma-separated provider codes or all. Active targets may be incomplete and then omit hash/size matching. Candidates carry match/reputation score, release_similarity, recommended, trusted/AI flags and download count |
 | POST | `/api/subtitles/apply` | download and atomically write one confirmed subtitle for an archived target; dry-run and collisions are refused |
 | POST | `/subtitles/search` | SSR/HTMX subtitle preview modal, or active-torrent result fragment when torrent_hash, file_index and languages are supplied |

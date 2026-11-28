@@ -514,7 +514,8 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			TestPath: "/subtitles/test", TestLabel: "Test connessione", TestHint: "Verifica API key e accesso al provider senza salvare le modifiche.",
 			Fields: []uiFormField{
 				boolFieldHint("enabled", "Abilita sottotitoli", "Mostra la ricerca dei sottotitoli su episodi, film e dettagli dei torrent.", settingsBool(cfg, subtitleSettingEnabled, false)),
-				{Name: "provider_url", Label: "URL provider", Value: settingsOr(cfg, subtitleSettingProviderURL, subtitleprovider.DefaultBaseURL), Hint: "Indirizzo API compatibile con OpenSubtitles REST."},
+				{Name: "provider_kind", Label: "Motore sottotitoli", Kind: "select", Value: settingsOr(cfg, subtitleSettingProviderKind, "com"), Hint: "OpenSubtitles.com usa l'API REST e la chiave API; OpenSubtitles.org usa l'API legacy, non richiede chiave e ripiega sull'accesso anonimo se le credenziali non sono valide.", Options: []uiFormOption{{Value: "com", Label: "OpenSubtitles.com (API REST)"}, {Value: "org", Label: "OpenSubtitles.org (legacy)"}}},
+				{Name: "provider_url", Label: "URL provider", Value: settingsOr(cfg, subtitleSettingProviderURL, subtitleprovider.DefaultBaseURL), Hint: "Indirizzo dell'API REST OpenSubtitles.com; con OpenSubtitles.org viene ignorato."},
 				{Name: "api_key", Label: "API key", Kind: "secret", Hint: "Lascia vuoto per mantenere la chiave salvata."},
 				{Name: "username", Label: "Utente", Value: settingsOr(cfg, subtitleSettingUsername, ""), Hint: "Facoltativo: senza account si usa l'accesso anonimo con API key."},
 				{Name: "password", Label: "Password", Kind: "secret", Hint: "Lascia vuoto per mantenere la password salvata."},

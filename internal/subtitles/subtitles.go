@@ -128,12 +128,13 @@ type Subtitle struct {
 		Season    int            `json:"season_number"`
 		Episode   int            `json:"episode_number"`
 	} `json:"feature_details"`
-	DownloadCount     int   `json:"download_count"`
-	HearingImpaired   *bool `json:"hearing_impaired"`
-	ForeignPartsOnly  *bool `json:"foreign_parts_only"`
-	FromTrusted       *bool `json:"from_trusted"`
-	AITranslated      *bool `json:"ai_translated"`
-	MachineTranslated *bool `json:"machine_translated"`
+	DownloadCount     int     `json:"download_count"`
+	FPS               float64 `json:"fps,omitempty"`
+	HearingImpaired   *bool   `json:"hearing_impaired"`
+	ForeignPartsOnly  *bool   `json:"foreign_parts_only"`
+	FromTrusted       *bool   `json:"from_trusted"`
+	AITranslated      *bool   `json:"ai_translated"`
+	MachineTranslated *bool   `json:"machine_translated"`
 }
 
 func (s Subtitle) Release() string {
@@ -414,20 +415,32 @@ func (c *Client) Search(ctx context.Context, query SearchQuery) ([]Subtitle, err
 	if language := strings.TrimSpace(query.Language); language != "" {
 		values.Set("languages", language)
 	}
-	if kind := strings.TrimSpace(query.Kind); kind != "" {
+	kind := strings.TrimSpace(query.Kind)
+	if kind != "" {
 		values.Set("type", kind)
 	}
-	if title := strings.TrimSpace(query.Title); title != "" {
-		values.Set("query", title)
-	}
-	if query.Year > 0 {
-		values.Set("year", strconv.Itoa(query.Year))
-	}
-	if id := strings.TrimPrefix(strings.TrimSpace(query.IMDbID), "tt"); id != "" {
-		values.Set("imdb_id", id)
-	}
-	if id := strings.TrimSpace(query.TMDBID); id != "" {
-		values.Set("tmdb_id", id)
+	// OpenSubtitles treats query/title and tmdb_id as alternative searches:
+	// sending both makes the ID search return nothing, even when the film has
+	// subtitles. A movie is therefore searched by its external ID alone; an
+	// episode keeps its title and episode identity, with parent_tmdb_id for the
+	// series. IMDb is the fallback external ID when TMDB is unavailable.
+	movieByID := kind == "movie" && strings.TrimSpace(query.TMDBID) != ""
+	if movieByID {
+		values.Set("tmdb_id", strings.TrimSpace(query.TMDBID))
+	} else {
+		if id := strings.TrimPrefix(strings.TrimSpace(query.IMDbID), "tt"); id != "" && kind == "movie" {
+			values.Set("imdb_id", id)
+		} else {
+			if title := strings.TrimSpace(query.Title); title != "" {
+				values.Set("query", title)
+			}
+			if query.Year > 0 {
+				values.Set("year", strconv.Itoa(query.Year))
+			}
+		}
+		if id := strings.TrimSpace(query.TMDBID); id != "" && kind == "episode" {
+			values.Set("parent_tmdb_id", id)
+		}
 	}
 	if query.Season > 0 {
 		values.Set("season_number", strconv.Itoa(query.Season))

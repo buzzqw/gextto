@@ -1,13 +1,16 @@
 package gextto
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -90,6 +93,9 @@ func TestV2TorrentSubtitleSearchShowsScoreAndLanguageFilter(t *testing.T) {
 	}
 	server := httptest.NewServer(Router(state))
 	defer server.Close()
+	var logs bytes.Buffer
+	logging.SetOutput(&logs)
+	defer logging.SetOutput(os.Stdout)
 	code, body := v2Request(t, server, http.MethodPost, "/subtitles/search", url.Values{
 		"torrent_hash": {hash}, "file_index": {"0"}, "languages": {"all"},
 	})
@@ -98,6 +104,11 @@ func TestV2TorrentSubtitleSearchShowsScoreAndLanguageFilter(t *testing.T) {
 	}
 	if !strings.Contains(body, "Il file non è ancora completo") {
 		t.Fatalf("the incomplete-file warning is missing: %s", body)
+	}
+	for _, expected := range []string{"Looking for subtitles for a video", "title: Show S01E01", "Found 1 subtitles for a video"} {
+		if !strings.Contains(logs.String(), expected) {
+			t.Fatalf("subtitle search log is missing %q: %s", expected, logs.String())
+		}
 	}
 }
 

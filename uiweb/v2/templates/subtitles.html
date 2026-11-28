@@ -66,7 +66,7 @@
       <td class="truncate" {{trTitle .Release}}>{{tr .Release}}</td>
       <td><strong>{{.ReleaseSimilarity}}%</strong> {{if .HashMatch}}<span class="badge ok">{{tr "Hash file esatto"}}</span>{{end}}{{if .SizeMatch}} <span class="badge">{{tr "Dimensione esatta"}}</span>{{end}}{{if .ExternalIDMatch}} <span class="badge">{{tr "ID esterno"}}</span>{{end}}</td>
       <td><strong>{{.Score}}/100</strong>{{if .Recommended}} <span class="badge ok">{{tr "Consigliato"}}</span>{{end}}</td>
-      <td>{{if .IsTrusted}}<span class="badge ok">{{tr "Trusted"}}</span>{{end}}{{if .IsAITranslated}} <span class="badge warn">{{tr "Tradotto con AI"}}</span>{{end}}{{if .IsMachineTranslated}} <span class="badge warn">{{tr "Traduzione automatica"}}</span>{{end}}<br /><small class="muted">{{tr "Download"}}: {{.DownloadCount}}</small></td>
+      <td>{{if .IsTrusted}}<span class="badge ok">{{tr "Trusted"}}</span>{{end}}{{if .IsAITranslated}} <span class="badge warn">{{tr "Tradotto con AI"}}</span>{{end}}{{if .IsMachineTranslated}} <span class="badge warn">{{tr "Traduzione automatica"}}</span>{{end}}<br /><small class="muted">{{tr "Download"}}: {{.DownloadCount}}{{if gt .FPS 0.0}} · {{printf "%.3f" .FPS}} {{tr "FPS"}}{{end}}</small></td>
     </tr>{{end}}</tbody>
   </table></div>
   {{else}}<p class="muted">{{tr "Nessun sottotitolo trovato con questi filtri."}}</p>{{end}}

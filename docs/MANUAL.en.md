@@ -1748,11 +1748,16 @@ Without a trash configured Gextto never deletes source files by itself.
 
 ### External subtitles
 
-In *Integrations → Subtitles* you can configure an OpenSubtitles-compatible
-provider with an API key; account and password are optional, and forced and SDH
-are filtered independently. **Test connection** checks the API key and provider
-access with the values currently written in the form, without saving them: the
-test search downloads no subtitles.
+In *Integrations → Subtitles* choose the **subtitle engine**:
+**OpenSubtitles.com** uses the REST API and requires the API key, while
+**OpenSubtitles.org** uses the legacy API, needs no key and also accepts
+anonymous access; if the configured credentials are not valid on that service,
+it falls back to anonymous access by itself. With OpenSubtitles.org the REST API
+address is ignored;
+account and password remain optional, and forced and SDH are filtered
+independently. **Test connection** checks the selected engine with the values
+currently written in the form, without saving them: the test search downloads
+no subtitles.
 
 Languages are chosen on each series or movie, in the *Subtitles* field: when you
 fill it, Gextto looks for those subtitles on every cycle and writes an `.srt`
@@ -1774,7 +1779,9 @@ count. The **score** combines these signals and marks a **Recommended** choice
 per language; it is not a measurement of the subtitle's technical quality. While
 a file is incomplete, the search uses identity and name similarity without
 presenting the final hash or size as known. A file holding several episodes is
-refused until you choose one unambiguous episode.
+refused until you choose one unambiguous episode. Every manual search leaves the
+title, requested language and number of results in the log; a failed search
+records the reason.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads

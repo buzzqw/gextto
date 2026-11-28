@@ -89,6 +89,36 @@ func serverURL(r *http.Request) string {
 	return "http://" + r.Host
 }
 
+func TestSearchUsesAlternativesNotTitleAndTMDBTogether(t *testing.T) {
+	var queries []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.URL.RawQuery)
+		_, _ = io.WriteString(w, `{"data":[]}`)
+	}))
+	defer server.Close()
+	client, err := New(Config{BaseURL: server.URL, APIKey: "key", Client: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Search(context.Background(), SearchQuery{Kind: "movie", Title: "Iron Lung", Year: 2026, TMDBID: "1116201"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Search(context.Background(), SearchQuery{Kind: "episode", Title: "Show", TMDBID: "1399", Season: 1, Episode: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if len(queries) != 2 {
+		t.Fatalf("queries = %v", queries)
+	}
+	movie := queries[0]
+	if !strings.Contains(movie, "tmdb_id=1116201") || strings.Contains(movie, "query=") || strings.Contains(movie, "year=") {
+		t.Fatalf("movie query mixes title and tmdb id: %s", movie)
+	}
+	episode := queries[1]
+	if !strings.Contains(episode, "parent_tmdb_id=1399") || !strings.Contains(episode, "query=Show") || !strings.Contains(episode, "season_number=1") || !strings.Contains(episode, "episode_number=2") {
+		t.Fatalf("episode query = %s", episode)
+	}
+}
+
 func TestLoginUsesProviderBaseURL(t *testing.T) {
 	var searches atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
