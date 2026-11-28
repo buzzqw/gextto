@@ -117,6 +117,8 @@ type TmdbMovieDetails struct {
 	Overview      *string `json:"overview"`
 	PosterPath    *string `json:"poster_path"`
 	ReleaseDate   *string `json:"release_date"`
+	// Runtime is the film's runtime in minutes, as TMDB reports it.
+	Runtime *int64 `json:"runtime"`
 }
 
 // episodeResult mirrors the private `EpisodeResult`.
@@ -474,6 +476,43 @@ func (t *TmdbClient) MovieDetails(ctx context.Context, tmdbID string) (*TmdbMovi
 		return nil, err
 	}
 	return &details, nil
+}
+
+// MovieRuntimeMinutes returns the film's runtime in minutes, or 0 when TMDB
+// does not know it. It is cached: the identity check of a completed download
+// asks for it once per film, and TMDB changes a runtime only for a film that is
+// not out yet.
+func (t *TmdbClient) MovieRuntimeMinutes(ctx context.Context, tmdbID string) (int64, error) {
+	if !t.Configured() {
+		return 0, nil
+	}
+	id := strings.TrimSpace(tmdbID)
+	if id == "" {
+		return 0, nil
+	}
+	cacheKey := "movie_runtime:" + id
+	if cached, ok := t.cacheGet(cacheKey); ok {
+		var minutes int64
+		if cached != nil {
+			if err := json.Unmarshal([]byte(*cached), &minutes); err == nil {
+				return minutes, nil
+			}
+		}
+		return 0, nil
+	}
+	details, err := t.MovieDetails(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	minutes := int64(0)
+	if details != nil && details.Runtime != nil && *details.Runtime > 0 {
+		minutes = *details.Runtime
+	}
+	if data, err := json.Marshal(minutes); err == nil {
+		value := string(data)
+		t.cacheSet(cacheKey, &value)
+	}
+	return minutes, nil
 }
 
 // MovieAlternativeTitles returns the alternative titles TMDB knows for a

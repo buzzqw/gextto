@@ -470,6 +470,8 @@ func blocklistReasonText(reason string) string {
 		return "the pack holds none of the episodes you need"
 	case "season_pack_identity_mismatch":
 		return "the pack does not hold the season it promises"
+	case "movie_identity_mismatch":
+		return "the download is not the film it promises"
 	case "in_progress_pack_incomplete":
 		return "the pack is incomplete"
 	case "dead_magnet":

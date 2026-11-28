@@ -672,6 +672,27 @@ such as "Film A 2" stays another film. Without that boundary it was enough for
 the article-less title to be the first word of another release's name for Gextto
 to download it in place of the chosen film.
 
+The film is checked twice more, on the data of the download and not only on the
+release name:
+
+- **as soon as the torrent metadata arrives**, before a byte is downloaded: the
+  name the torrent really carries must be the film's; a name that belongs to
+  another film of the list, or that does not carry this film's title, discards
+  the torrent and puts the release on the **blocklist** with the reason *the
+  download is not the film it promises*. It is the same check a season pack gets
+  on the files it holds.
+- **once the download is complete**, before it enters the library: Gextto reads
+  the real duration of the file and compares it with the one TMDB gives for the
+  film, with a margin (at least a quarter of an hour) for an extended cut and
+  the credits. A duration that does not match is another film: the file is
+  discarded and the release blocklisted, as above.
+
+In both cases the film stays in the queue and the search goes on with another
+release; the refused file goes to the trash, or is deleted according to
+*Settings → Cleanup*. When the data is not enough — TMDB does not give the
+duration, `ffprobe` is missing, the name is unreadable — nothing is refused: a
+doubtful copy must never become a missing film.
+
 ### The movie page
 
 It shows poster, plot, cast, the **best results** found in the sources and the

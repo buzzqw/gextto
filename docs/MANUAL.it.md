@@ -682,6 +682,27 @@ seguito come «Film A 2» resta un altro film. Senza questo confine bastava che 
 titolo senza articolo fosse la prima parola del nome di un'altra release perché
 Gextto la scaricasse al posto del film scelto.
 
+Il film si controlla altre due volte, sui dati del download e non solo sul nome
+della release:
+
+- **appena arrivano i metadati del torrent**, prima di scaricare un byte: il
+  nome che il torrent porta davvero deve essere quello del film; se è il nome di
+  un altro film della lista, o non porta il titolo di questo, il torrent viene
+  scartato e la release finisce nei **bloccati** con il motivo *il download non
+  è il film che promette*. È lo stesso controllo che riceve un season pack sui
+  file che contiene.
+- **finito il download**, prima di entrare in libreria: Gextto legge la durata
+  reale del file e la confronta con quella che TMDB indica per il film, con un
+  margine (almeno un quarto d'ora) per il taglio esteso e i titoli di coda. Una
+  durata che non torna è un altro film: il file viene scartato e la release
+  bloccata, come sopra.
+
+In entrambi i casi il film resta in coda e la ricerca continua con un'altra
+release; il file rifiutato va nel cestino, o viene cancellato secondo la scelta
+di *Configurazione → Pulizia*. Quando i dati non bastano — TMDB non indica la
+durata, `ffprobe` non c'è, il nome non è leggibile — non viene rifiutato niente:
+una copia dubbia non deve mai diventare un film mancante.
+
 ### La scheda del film
 
 Mostra locandina, trama, cast, i **migliori risultati** trovati nelle sorgenti

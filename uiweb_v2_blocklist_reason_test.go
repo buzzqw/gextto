@@ -20,6 +20,7 @@ func TestBlocklistReasonLabelSaysWhyInWords(t *testing.T) {
 		"corrupt_file":                  "il file scaricato era danneggiato",
 		"pack_inspection_useless":       "il pack non contiene puntate che servono",
 		"season_pack_identity_mismatch": "il pack non contiene la stagione che promette",
+		"movie_identity_mismatch":       "il download non è il film che promette",
 		"in_progress_pack_incomplete":   "il pack è incompleto",
 		"dead_magnet":                   "il magnet non funzionava",
 		"unsafe_payload":                "il contenuto non è sicuro",

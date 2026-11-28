@@ -3067,6 +3067,13 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 			return false, tevRejectUnconfirmedUpgrade(cfg, db, torrents, event, release, reason)
 		}
 	}
+	// The file's own metadata says whether it is the film: a payload whose
+	// duration is not the film's is another film, whatever its name promised.
+	if release.Kind == "movie" && !recoveredExisting {
+		if reason := movieRuntimeMismatch(context.Background(), cfg, release, path, tmdb); reason != "" {
+			return false, tevRejectWrongMovie(cfg, db, torrents, event, release, reason)
+		}
+	}
 	size, err := SizeOfPath(path)
 	if err != nil {
 		return false, err
@@ -3553,6 +3560,28 @@ func tevMetadataReceived(cfg *Config, torrents TorrentSession, db *Database, met
 			}
 			if _, err := torrents.Remove(event.Hash, true); err != nil {
 				logging.Warn("failed to remove mismatched season pack",
+					"hash", event.Hash, "error", err.Error())
+			}
+			return false, nil
+		}
+	}
+	// A film is checked the same way, on the name the torrent really carries:
+	// an indexer can list one film under the name of another, and the payload
+	// is refused before a piece of it is downloaded.
+	if metadata.Release.Kind == "movie" {
+		if reason := movieIdentityMismatch(cfg, &metadata.Release, event.Name); reason != "" {
+			logging.Warn(fmt.Sprintf("🗑️ %s: «%s» discarded before the download, %s",
+				logTarget(&metadata.Release), shortTorrentName(event.Name), reason), "hash", event.Hash)
+			if err := db.MarkTorrentError(event.Hash, reason); err != nil {
+				return false, err
+			}
+			if err := db.Blocklist(&metadata.Release, movieIdentityBlockReason); err != nil {
+				// A `.torrent`-only release has no magnet to key the block on:
+				// the refusal still stands, the release is simply not remembered.
+				logging.Warn("could not blocklist the torrent that is not the film", "hash", event.Hash, "error", err)
+			}
+			if _, err := torrents.Remove(event.Hash, true); err != nil {
+				logging.Warn("failed to remove the torrent that is not the film",
 					"hash", event.Hash, "error", err.Error())
 			}
 			return false, nil
