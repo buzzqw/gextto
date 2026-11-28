@@ -423,23 +423,6 @@ html, body {
   padding-top: 9px;
   padding-bottom: 9px;
 }
-/* Compact session strip right under the intro: live counts at a glance. */
-.session-strip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 16px;
-}
-.session-strip-title {
-  font-size: 0.95rem;
-}
-.session-strip .btn {
-  margin-left: auto;
-}
-/* The session frame carries the live bandwidth chart below the summary line. */
-.session-strip-panel .traffic {
-  margin-top: 10px;
-}
 /* Live session counter in the panel head: same type as the title. */
 .session-count {
   font: inherit;
@@ -626,40 +609,6 @@ html, body {
 .dashboard-problems-table thead th { white-space: normal; }
 .dashboard-problems-table .problems-reason { min-width: 16ch; }
 
-/* Dashboard summary moved into the header (series/movies, free space,
-   archived magnets, engine): compact cards matching the top metrics, so the
-   page keeps the row they used to take. */
-.top-kpis {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 5px;
-  flex: none;
-  /* The Dashboard summary sits at the far right of the controls row, under the
-     clock, leaving language and controls at the left. */
-  margin-left: auto;
-}
-.top-kpi {
-  display: inline-flex;
-  flex-direction: column;
-  justify-content: center;
-  height: 48px;
-  padding: 4px 10px;
-  border: 1px solid var(--btn-line);
-  border-radius: var(--radius-sm);
-  background: var(--btn);
-  color: var(--btn-text);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-  white-space: nowrap;
-}
-.top-kpi-label {
-  font-size: 0.62rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.top-kpi strong { font-size: 0.86rem; }
-.top-kpi small { font-size: 0.62rem; color: var(--muted); }
 /* Medium desktops cannot fit the title and the full control strip on one line
    without truncating the title, so the chrome stacks: title on its own row,
    controls below. */
@@ -1659,15 +1608,8 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
     background-size: 24px 100%;
   }
 
-  /* --- Dashboard: what is happening first, shortcuts after ------------- */
+  /* --- Dashboard: the page order is already "what is happening first" --- */
   .dashboard-view { display: flex; flex-direction: column; }
-  .dashboard-view > .session-strip-panel { order: 0; }
-  .dashboard-view > .dashboard-cycle-panel { order: 1; }
-  .dashboard-view > .panel:not(.dashboard-search-panel):not(.dashboard-explore-panel):not(.dashboard-feed-panel) { order: 4; }
-  .dashboard-view > .dashboard-search-panel { order: 5; }
-  .dashboard-view > * { order: 6; }
-  .dashboard-view .dashboard-explore-panel,
-  .dashboard-view > .dashboard-intro { display: none; } /* the strip shows DRY-RUN */
 
   /* --- Scarico: the list first, adding a torrent one tap away ---------- */
   .downloads-view { display: flex; flex-direction: column; }
@@ -3258,6 +3200,8 @@ body { -webkit-font-smoothing: antialiased; }
     border-color: var(--line);
   }
   .sidebar .nav-item.active .nav-icon { color: var(--accent); }
+  .sidebar > nav,
+  .sidebar > .brand { flex-shrink: 0; }
   .sidebar .sidebar-foot {
     display: block;
     margin-top: auto;
@@ -3373,7 +3317,7 @@ body { -webkit-font-smoothing: antialiased; }
 .dash-now-body .dash-meter { margin: 6px 0 3px; }
 .dash-now-meta { display: flex; justify-content: space-between; gap: 6px; font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dash-now-meta strong { color: var(--text); }
-.dash-empty { margin: 0; padding: 4px 16px 16px; }
+.dash-now > .dash-empty { grid-column: 1 / -1; margin: 0; padding: 4px 2px 2px; font-size: 0.86rem; }
 
 .dash-row { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
 .dash-row-even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -3419,6 +3363,7 @@ body { -webkit-font-smoothing: antialiased; }
 
 .dash-kv .row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .dash-v3 .dashboard-quick-actions { margin-top: 12px; }
+.dash-v3 .dashboard-quick-actions .btn { min-height: 38px; font-size: 0.86rem; }
 
 @media (max-width: 1300px) {
   .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3430,7 +3375,6 @@ body { -webkit-font-smoothing: antialiased; }
   .dash-day:nth-child(n+5) { display: none; }
 }
 @media (max-width: 700px) {
-  .dash-v3 > * { order: 0 !important; }
   .dash-now { grid-template-columns: minmax(0, 1fr); }
   .dash-proc { grid-template-columns: 70px minmax(30px, 1fr) 48px; }
   .dash-proc small { display: none; }
@@ -3444,9 +3388,3 @@ body { -webkit-font-smoothing: antialiased; }
   .dash-meter i,
   .live-side-bars i { transition: none; }
 }
-@media (min-width: 901px) {
-  .sidebar > nav,
-  .sidebar > .brand { flex-shrink: 0; }
-}
-.dash-now > .dash-empty { grid-column: 1 / -1; padding: 4px 2px 2px; font-size: 0.86rem; }
-.dash-v3 .dashboard-quick-actions .btn { min-height: 38px; font-size: 0.86rem; }

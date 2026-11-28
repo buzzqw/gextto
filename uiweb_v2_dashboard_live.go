@@ -229,6 +229,7 @@ func v2DashStatsFrom(s *AppState, chrome uiShellChrome) v2DashStats {
 		Torrents:  chrome.Torrents,
 		Active:    chrome.Transferring,
 		Waiting:   chrome.Stuck,
+		Seeding:   chrome.Seeding,
 	}
 	stats.Load = append(stats.Load, v2DashLoadRow{Label: "Gextto", Value: chrome.CPU, Detail: chrome.RAM, Pct: percentOf(chrome.CPUPercent), Kind: "app", Title: "CPU e RAM del processo Gextto"})
 	if chrome.GxLoad != "" {
@@ -247,13 +248,6 @@ func v2DashStatsFrom(s *AppState, chrome uiShellChrome) v2DashStats {
 			row.Detail = logging.HumanBytesI64(saturatingInt64(total-available)) + " / " + logging.HumanBytesI64(saturatingInt64(total))
 		}
 		stats.Load = append(stats.Load, row)
-	}
-	if s != nil && s.hasTorrentEngine() {
-		for _, view := range SessionSnapshot(s.activeEngine()) {
-			if view.Progress >= 100 && (view.IsSeeding || view.State == "seeding" || view.State == "finished") {
-				stats.Seeding++
-			}
-		}
 	}
 	network := v2DashNetworkFrom(s)
 	stats.HasDHT, stats.DHTNodes = network.HasDHT, network.DHTNodes
@@ -352,8 +346,11 @@ func v2DashNowFrom(s *AppState) v2DashNowView {
 		return view
 	}
 	cfg := latestConfig(s)
+	// The release name is parsed only for the few downloads shown: a session
+	// can hold dozens of unfinished torrents.
 	type candidate struct {
 		item  v2DashNowItem
+		name  string
 		rate  uint64
 		pct   float64
 		named string
@@ -365,8 +362,7 @@ func v2DashNowFrom(s *AppState) v2DashNowView {
 				continue
 			}
 			view.Total++
-			title, sub, series := v2DashTitle(cfg, torrent.Name)
-			item := v2DashNowItem{Title: title, Sub: sub, Network: "torrent", Pct: percentOf(torrent.Progress)}
+			item := v2DashNowItem{Network: "torrent", Pct: percentOf(torrent.Progress)}
 			item.Progress = strconv.Itoa(item.Pct) + "%"
 			switch {
 			case TorrentTransferring(torrent):
@@ -385,7 +381,7 @@ func v2DashNowFrom(s *AppState) v2DashNowView {
 			default:
 				item.State, item.Stuck = "fermo", true
 			}
-			candidates = append(candidates, candidate{item: item, rate: torrent.DownloadRate, pct: torrent.Progress, named: series})
+			candidates = append(candidates, candidate{item: item, name: torrent.Name, rate: torrent.DownloadRate, pct: torrent.Progress})
 		}
 	}
 	for _, download := range Ed2kDownloads(cfg) {
@@ -393,8 +389,7 @@ func v2DashNowFrom(s *AppState) v2DashNowView {
 			continue
 		}
 		view.Total++
-		title, sub, series := v2DashTitle(cfg, download.Name)
-		item := v2DashNowItem{Title: title, Sub: strings.TrimPrefix(sub+" · eD2k", " · "), Network: "ed2k", Pct: percentOf(download.Progress())}
+		item := v2DashNowItem{Network: "ed2k", Pct: percentOf(download.Progress())}
 		item.Progress = strconv.Itoa(item.Pct) + "%"
 		if download.Speed > 0 {
 			view.Active++
@@ -403,7 +398,7 @@ func v2DashNowFrom(s *AppState) v2DashNowView {
 		} else {
 			item.State, item.Stuck = "fermo", true
 		}
-		candidates = append(candidates, candidate{item: item, rate: uint64(max(download.Speed, 0)), pct: download.Progress(), named: series})
+		candidates = append(candidates, candidate{item: item, name: download.Name, rate: uint64(max(download.Speed, 0)), pct: download.Progress()})
 	}
 	for _, download := range HTTPDownloads() {
 		if download.Status != "downloading" {
@@ -432,9 +427,21 @@ func v2DashNowFrom(s *AppState) v2DashNowView {
 		candidates = candidates[:v2DashNowLimit]
 	}
 	names := []string{}
-	for _, c := range candidates {
-		if c.named != "" {
-			names = append(names, c.named)
+	for index := range candidates {
+		c := &candidates[index]
+		if c.item.Network == "http" {
+			continue
+		}
+		title, sub, series := v2DashTitle(cfg, c.name)
+		c.item.Title, c.named = title, series
+		switch {
+		case c.item.Network == "ed2k":
+			c.item.Sub = strings.TrimPrefix(sub+" · eD2k", " · ")
+		default:
+			c.item.Sub = sub
+		}
+		if series != "" {
+			names = append(names, series)
 		}
 	}
 	posters := map[string]string{}
@@ -467,7 +474,6 @@ type v2DashHealthRow struct {
 	Note   string
 	Warn   bool
 	Title  string
-	Bars   []int
 	Dots   []bool
 }
 
@@ -578,8 +584,15 @@ func v2DashHealthFrom(s *AppState) v2DashHealthView {
 			default:
 				row.Detail, row.Warn = "ID basso", true
 			}
-			if health.Kad != "" {
-				row.Value, row.Note = health.Kad, "Kad"
+			switch health.Kad {
+			case "connected":
+				row.Value, row.Note = "Connesso", "Kad"
+			case "firewalled":
+				row.Value, row.Note = "Connesso, dietro firewall", "Kad"
+			case "connecting":
+				row.Value, row.Note = "In connessione…", "Kad"
+			case "stopped":
+				row.Value, row.Note = "Fermo", "Kad"
 			}
 		}
 		add(row)

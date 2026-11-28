@@ -427,11 +427,6 @@ type v2ShellData struct {
 	// Ed2kCore is the active eD2k backend name. Templates use it only in
 	// interface labels; user data is never rewritten to match the backend.
 	Ed2kCore string
-	// Dashboard, only on the dashboard page, carries the summary badges
-	// (series/movies, free space, archived magnets, engine) shown in the top
-	// bar: keeping them in the header saves the row they used to occupy in the
-	// page body.
-	Dashboard *v2DashboardView
 }
 
 func v2Render(w http.ResponseWriter, status int, name string, data any, s *AppState) {
@@ -714,7 +709,6 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 	return v2DashboardView{
 		uiDashboardData: base,
 		Calendar:        calendar,
-		Stats:           v2DashStatsFrom(s, uiShellChromeFrom(s)),
 		Now:             v2DashNowFrom(s),
 		Health:          v2DashHealthFrom(s),
 		Week:            v2DashWeekFrom(calendar, time.Now()),
@@ -1002,8 +996,11 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		ClientI18n: v2ClientI18nJSON(s),
 		Ed2kCore:   v2Ed2kCoreName(cfg),
 	}
+	// The Dashboard strip reuses the chrome just built for the page: one
+	// process sample and one session read per load, not two.
 	if dashboard, ok := content.(v2DashboardView); ok {
-		page.Dashboard = &dashboard
+		dashboard.Stats = v2DashStatsFrom(s, page.Chrome)
+		page.Content = dashboard
 	}
 	if notes, ok := PendingUpdateNotes(cfg); ok {
 		page.UpdateNotes = notes

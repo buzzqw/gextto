@@ -108,7 +108,9 @@ type uiShellChrome struct {
 	// with the value seen last time to show only new warnings).
 	Transferring int
 	Stuck        int
-	Problems     uint64
+	// Seeding counts the finished torrents still sharing, for the Dashboard.
+	Seeding  int
+	Problems uint64
 	// ActiveDownloads is the badge on "Scarico": unfinished torrents plus the
 	// direct HTTP downloads still running (seeding torrents are not counted).
 	ActiveDownloads string
@@ -221,6 +223,9 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		totalDl++
 		if view.Progress < 100 {
 			activeDl++
+		}
+		if view.Progress >= 100 && (view.IsSeeding || view.State == "seeding" || view.State == "finished") {
+			chrome.Seeding++
 		}
 		chrome.Peers += view.NumPeers
 		chrome.Seeds += view.NumSeeds

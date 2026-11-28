@@ -195,22 +195,6 @@
 
 {{define "v2_dashboard_search_results"}}{{template "v2_search_results" .}}{{end}}
 
-{{define "v2_dashboard_calendar"}}
-<div class="view">
-  <div class="panel dashboard-calendar-panel">
-    <div class="panel-head"><h3>{{tr "Prossime uscite"}}</h3><small class="muted" {{trTitle "Data della prima messa in onda originale (TMDB): la versione italiana può arrivare molto più tardi."}}>{{tr "Serie TV · messa in onda originale"}}</small></div>
-    <div class="panel-body">
-      <div class="dashboard-list">
-        {{if .}}{{range .}}<div class="list-item">
-          {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">{{tr "N/D"}}</div>{{end}}
-          <div><strong>{{if .TvdbURL}}<a href="{{.TvdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri la serie su TVDB"}}>{{tr .Series}}</a>{{else if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" {{trTitle "Apri la serie su TMDB"}}>{{tr .Series}}</a>{{else}}{{tr .Series}}{{end}}</strong><small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{tr .AirDate}}{{else}}{{tr "data non disponibile"}}{{end}}</small></div>
-        </div>{{end}}{{else}}<p class="muted">{{tr "Nessuna uscita in programma."}}</p>{{end}}
-      </div>
-    </div>
-  </div>
-</div>
-{{end}}
-
 {{define "v2_dashboard_feed"}}
 {{if .Error}}<p class="alert">{{tr .Error}}</p>
 {{else if .Rows}}<table class="data-table"><thead><tr><th>{{tr "Monitorato"}}</th><th>{{tr "Tipo"}}</th><th>{{tr "Release"}}</th><th>{{tr "Fonte"}}</th><th>{{tr "Azioni"}}</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{tr .Name}}</td><td>{{if eq .Kind "movie"}}{{tr "Film"}}{{else}}{{tr "Serie TV"}}{{end}}</td><td class="truncate" {{trTitle .Title}}>{{tr .Title}}</td><td>{{tr .Source}}</td><td><form hx-post="/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" class="inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">{{tr "Accoda"}}</button></form></td></tr>{{end}}</tbody></table>

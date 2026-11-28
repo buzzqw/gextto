@@ -61,47 +61,21 @@ type uiNavGroup struct {
 
 // uiDashboardData is the view-model of the dashboard partial.
 type uiDashboardData struct {
-	Active  bool
-	DryRun  bool
-	Backend string
-	// EngineLabel and EngineVersion name the torrent engine actually moving the
-	// bytes (e.g. "gx-core 1.1.193", "qBittorrent-nox v5.1.1"); both empty with
-	// an engine that does not report a version.
-	EngineLabel     string
-	EngineVersion   string
-	Torrents        int
-	Downloading     int
-	Idle            int
-	Seeding         int
-	Paused          int
-	Errors          int
-	DownloadRate    uint64
-	UploadRate      uint64
-	UpdatedAt       string
-	CycleScraped    int
-	CycleCandidates int
-	CycleStarted    int
-	CycleGaps       int
-	CycleErrors     int
+	Active bool
+	DryRun bool
+	// The outcome of the last search cycle, for "Ricerca automatica".
+	CycleStarted int
+	CycleGaps    int
+	CycleErrors  int
 	// Missing is the number of episodes the library still owes: the count
-	// behind the "Mancanti" quick link, so the badge is not a separate query
-	// in the browser.
-	Missing int
-	// Parity data from the classic dashboard.
-	SeriesConfigured int
-	MoviesConfigured int
-	ArchiveTotal     int64
-	FreeSpace        uint64
-	TrashBytes       uint64
-	SeenGroups       int64
-	TrashCount       int64
-	NextCycle        string
-	CycleInterval    string
-	Consumption      uiConsumption
-	Recent           []uiRecentDownload
-	FeedMatches      []uiFeedMatch
-	Upcoming         []uiUpcoming
-	Panels           []uiPageSection
+	// behind the "Episodi mancanti" link, so it is not a separate query in the
+	// browser.
+	Missing       int
+	NextCycle     string
+	CycleInterval string
+	Consumption   uiConsumption
+	Recent        []uiRecentDownload
+	Panels        []uiPageSection
 }
 
 type uiConsumption struct {
@@ -144,18 +118,6 @@ func uiRecentDestination(path string) string {
 		return "trasferimento"
 	}
 	return filepath.Base(filepath.Clean(folder))
-}
-
-type uiFeedMatch struct {
-	Title  string
-	Source string
-	Kind   string
-}
-
-type uiUpcoming struct {
-	Series  string
-	Episode string
-	AirDate string
 }
 
 // uiTorrentRow is one row of the Scarico table.
@@ -466,81 +428,23 @@ func uiIsSystemPage(view string) bool {
 }
 
 func uiDashboardDataFrom(s *AppState) uiDashboardData {
+	// Only what the Dashboard shows from here: the live figures (session,
+	// space, archive, load) come from the strip, refreshed by the SSE stream,
+	// so they are not read a second time for every page load.
 	cfg := latestConfig(s)
-	engine := s.activeEngine()
-	var views []models.TorrentView
-	backend := "-"
-	if s.hasTorrentEngine() {
-		views = SessionSnapshot(engine)
-		backend = uiBackendLabel(engine.Name())
-	}
 	data := uiDashboardData{
-		Active:    cfg.Active,
-		DryRun:    cfg.DryRun,
-		Backend:   backend,
-		Torrents:  len(views),
-		UpdatedAt: uiNowClock(),
+		Active: cfg.Active,
+		DryRun: cfg.DryRun,
 	}
-	if identity, ok := engine.(TorrentEngineIdentity); ok {
-		data.EngineLabel, data.EngineVersion = identity.EngineVersion()
-	}
-	for _, view := range views {
-		switch view.State {
-		case "downloading", "downloading_metadata", "stalled":
-			// Only a download that is moving data counts as in progress.
-			if TorrentTransferring(view) {
-				data.Downloading++
-			} else {
-				data.Idle++
-			}
-		case "seeding", "finished":
-			data.Seeding++
-		case "paused", "queued":
-			data.Paused++
-		case "error":
-			data.Errors++
-		}
-		data.DownloadRate += view.DownloadRate
-		data.UploadRate += view.UploadRate
-	}
-	// aMule's downloads count like the torrents: in progress only while data
-	// is moving.
-	for _, download := range Ed2kDownloads(cfg) {
-		switch ed2kDownloadState(download) {
-		case "downloading":
-			data.Downloading++
-		case "queued", "checking":
-			data.Idle++
-		case "paused":
-			data.Paused++
-		case "error":
-			data.Errors++
-		}
-	}
-	ed2kDown, ed2kUp := v2Ed2kRates(s)
-	data.DownloadRate += ed2kDown
-	data.UploadRate += ed2kUp
 	cycle := s.last_cycle.Snapshot()
-	data.CycleScraped = cycle.Scraped
-	data.CycleCandidates = cycle.Candidates
 	data.CycleStarted = cycle.DownloadsStarted
 	data.CycleGaps = cycle.GapsFilled
 	data.CycleErrors = cycle.Errors
 
-	// The missing count is the same list the Missing tab shows. It is one
-	// query, but it gives the quick link a number instead of a bare label.
+	// The missing count is the same list the Missing tab shows: one query, and
+	// the link gets a number instead of a bare label.
 	if gaps, err := libraryGaps(s); err == nil {
 		data.Missing = len(gaps)
-	}
-
-	// Classic-dashboard data.
-	data.SeriesConfigured = len(cfg.Series)
-	data.MoviesConfigured = len(cfg.Movies)
-	if seenMovies, seenSeries, err := s.db.SeenCounts(); err == nil {
-		data.SeenGroups = seenMovies + seenSeries
-	}
-	if page, err := s.archive.BrowsePage("", 1, 1); err == nil && page != nil {
-		data.ArchiveTotal = page.Total
 	}
 	if stats, err := s.db.ConsumptionStats(); err == nil {
 		data.Consumption = uiConsumption{
@@ -566,23 +470,6 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 			})
 		}
 	}
-	trash := ""
-	if cfg.TrashPath != nil {
-		trash = *cfg.TrashPath
-	}
-	ramdisk := ""
-	if value, ok := cfg.Settings[settingTorrentRamdiskDir]; ok {
-		ramdisk = value
-	}
-	health := CheckWithPaths(&HealthPaths{
-		DataDir:      cfg.DataDir,
-		TrashPath:    trash,
-		DownloadPath: cfg.DownloadDir,
-		ArchiveRoot:  derefString(cfg.ArchiveRoot),
-		RamdiskPath:  ramdisk,
-	})
-	data.FreeSpace = health.DiskFreeBytes
-	data.TrashBytes = health.TrashBytes
 	if cfg.RefreshSecs > 0 {
 		data.CycleInterval = logging.HumanDuration(int64(cfg.RefreshSecs))
 		start, ok := s.db.LastCycleAt()

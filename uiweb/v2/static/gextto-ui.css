@@ -462,12 +462,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 /* ------------------------------------------------------------ primitives */
 
 .view { display: flex; flex-direction: column; gap: 14px; }
-.dashboard-collection-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.dashboard-list { display: flex; flex-direction: column; gap: 10px; }
-.dashboard-list .list-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 2px 0; }
-.dashboard-list .list-item > div:last-child { min-width: 0; flex: 1; }
-.dashboard-list .list-item strong, .dashboard-list .list-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dashboard-list .list-item small { color: var(--muted); margin-top: 2px; }
 .list-poster { width: 42px; height: 58px; flex: none; object-fit: cover; border-radius: 6px; background: var(--surface-3); }
 .list-poster.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 0.68rem; }
 /* generic two-column list (used by the database optimization tool) */
@@ -541,15 +535,6 @@ span.truncate { display: inline-block; max-width: 100%; vertical-align: bottom; 
 .metric.blue strong { color: var(--accent-2); }
 .metric.amber strong { color: var(--warn); }
 
-.dashboard-intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 4px 2px 2px;
-}
-.dashboard-intro h2 { margin-top: 2px; font-size: 1.35rem; }
-.dashboard-intro p { margin: 5px 0 0; }
 .eyebrow {
   color: var(--accent);
   font-size: 0.7rem;
@@ -557,17 +542,6 @@ span.truncate { display: inline-block; max-width: 100%; vertical-align: bottom; 
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.mode-badge {
-  flex: none;
-  padding: 7px 12px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-.mode-badge.active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.mode-badge.dry { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
 
 @media (min-width: 620px) {
   .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1653,12 +1627,6 @@ pre.log-view { margin: 0; }
 .sidebar .nav-group.system-group .nav-mobile-system-extra { display: none !important; }
 @media (min-width: 901px) { .nav-mobile-hidden { display: flex; } }
 
-@media (max-width: 560px) {
-  .dashboard-intro { flex-direction: column; }
-  .dashboard-intro h2 { font-size: 1.2rem; }
-}
-@media (max-width: 1100px) and (min-width: 701px) { .dashboard-collection-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 700px) { .dashboard-collection-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) {
   .torrent-add-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .torrent-add-action { min-height: 0; }
@@ -1908,24 +1876,19 @@ pre.log-view { margin: 0; }
 
   /* Quick actions should be reachable with one thumb and never form a long
      line of narrow buttons. */
-  .dashboard-quick-actions,
-  .dashboard-explore-actions {
+  .dashboard-quick-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: stretch;
   }
-  .dashboard-quick-actions > *,
-  .dashboard-explore-actions > * { width: 100%; min-width: 0; }
+  .dashboard-quick-actions > * { width: 100%; min-width: 0; }
   .dashboard-quick-actions > :first-child { grid-column: 1 / -1; }
-  .dashboard-quick-actions .btn,
-  .dashboard-explore-actions .btn { min-height: 44px; }
+  .dashboard-quick-actions .btn { min-height: 44px; }
 
   /* The explanation is useful on desktop but needlessly pushes the actual
      next-run value below the fold on a phone. */
   .dashboard-next-panel .dashboard-next-description { display: none; }
-  .dashboard-intro p,
   .dashboard-session-grid,
-  .dashboard-collection-grid,
   .dashboard-feed-panel,
   .dashboard-consumption-panel { display: none; }
 
