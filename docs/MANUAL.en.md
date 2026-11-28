@@ -283,7 +283,8 @@ in small capitals: the column is read at a glance. At the foot of the menu,
 below the areas, are the **Manual**, the **Changelog** and the **Licence**: they
 are pages to read, so they sit there as small links. Further down is a small
 panel with the **live** download and upload **speeds**, a bar chart of the last
-30 minutes (each bar is a minute and a half) and the *active* or *dry-run*
+30 minutes (each bar is a minute and a half, with the same minimum scale as the
+Dashboard chart) and the *active* or *dry-run*
 state. When the entries do not fit on the screen only the list of pages
 scrolls: the brand, the documentation and the panel stay put. On a phone the bottom bar is unchanged, and the manual,
 the changelog and the licence are in the **More** panel.
@@ -1933,9 +1934,13 @@ This is the page to look at every day. From the top:
   receiving data first, fastest on top), with the series poster when Gextto
   knows it, the episode, the bar, the speed and the time left. A stalled
   download has an orange bar. **Open Downloads** leads to the full list;
-- **Traffic** — the chart of the last 30 minutes (download and upload, with the
-  peak and the limit in force; with eD2k, aMule as dashed lines) and the
-  bandwidth of the last 30 days;
+- **Traffic** — the chart of the last 30 minutes (download and upload as smooth
+  curves with a shaded area below, with the peak and the limit in force; with
+  eD2k, aMule as dashed lines) and the bandwidth of the last 30 days. The scale
+  starts at 256 KB/s: background traffic of a few KB/s (DHT, eD2k) stays a thin
+  line at the bottom instead of looking like a transfer, and the exact figures
+  stay in the legend. Each point averages about twenty seconds, so a burst of an
+  instant does not turn into a spike;
 - **Health** — one line per area, with a green or orange mark: active RSS feeds
   and releases taken today, **indexers** (one dot per indexer, orange when
   Gextto has paused it after errors), failing **integrations**, the **title

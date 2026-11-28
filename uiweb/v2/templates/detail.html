@@ -96,9 +96,11 @@
       <span class="traffic-peak-figure" {{trTitle "Picco di upload nel periodo"}}><span class="traffic-peak-label">{{tr "Picco upload"}}</span> {{$v.PeakUp}}</span></span>
     </div>
     <svg class="traffic-chart" viewBox="0 0 {{$v.Width}} {{$v.Height}}" preserveAspectRatio="none" role="img" aria-label="{{tr "Grafico di download e upload di questo torrent, ultimi 30 minuti"}}">
-      <polygon class="traffic-area down" points="{{$v.DownArea}}" />
-      <polyline class="traffic-line up" points="{{$v.UpPoints}}" />
-      <polyline class="traffic-line down" points="{{$v.DownPoints}}" />
+      {{template "v2_traffic_fills" "v2-torrent-traffic"}}
+      <path class="traffic-area up" d="{{$v.UpArea}}" fill="url(#v2-torrent-traffic-up)" />
+      <path class="traffic-area down" d="{{$v.DownArea}}" fill="url(#v2-torrent-traffic-down)" />
+      <path class="traffic-line up" d="{{$v.UpLine}}" />
+      <path class="traffic-line down" d="{{$v.DownLine}}" />
     </svg>
     <div class="traffic-axis"><span>0</span><span>{{$v.ScaleLabel}}</span></div>
     {{else if $v.Idle}}<p class="muted traffic-idle">{{tr "Nessun trasferimento di questo torrent negli ultimi 30 minuti."}}</p>

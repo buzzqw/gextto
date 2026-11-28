@@ -282,7 +282,8 @@ titolo in maiuscoletto: la colonna si legge a colpo d'occhio. In fondo al menu,
 sotto le aree, ci sono il **Manuale**, il **Changelog** e la **Licenza**: sono
 pagine da leggere e stanno lì come piccoli collegamenti. Sotto ancora c'è un
 piccolo riquadro con le **velocità in diretta** di download e upload, un grafico a
-barre degli ultimi 30 minuti (ogni barra è un minuto e mezzo) e lo stato
+barre degli ultimi 30 minuti (ogni barra è un minuto e mezzo, con la stessa
+scala minima del grafico della Dashboard) e lo stato
 *attivo* o *dry-run*. Se le voci non entrano nello schermo, scorre solo la lista
 delle pagine: marca, documentazione e riquadro restano fermi. Sul telefono la barra in basso non cambia, e manuale, changelog e
 licenza sono nel menu **Altro**.
@@ -1963,9 +1964,13 @@ le chiavi in [Chiavi di accesso](api-keys.it.md).
   Gextto la conosce, l'episodio, la barra, la velocità e il tempo che manca. Un
   download fermo ha la barra arancione. **Apri Scarico** porta alla lista
   completa;
-- **Traffico** — il grafico degli ultimi 30 minuti (download e upload, con il
-  picco e il limite in vigore; con eD2k, aMule a linee tratteggiate) e la banda
-  degli ultimi 30 giorni;
+- **Traffico** — il grafico degli ultimi 30 minuti (download e upload come curve
+  morbide con l'area sfumata sotto, con il picco e il limite in vigore; con
+  eD2k, aMule a linee tratteggiate) e la banda degli ultimi 30 giorni. La scala
+  parte da 256 KB/s: il traffico di fondo di pochi KB/s (DHT, eD2k) resta una
+  linea sottile in basso invece di sembrare un trasferimento, e le cifre esatte
+  restano nella legenda. Ogni punto è la media di una ventina di secondi, così
+  un picco di un istante non diventa una punta;
 - **Salute** — una riga per area, con un segno verde o arancione: feed RSS
   attivi e release prese oggi, **indexer** (un punto per indexer, arancione se
   Gextto l'ha messo in pausa dopo degli errori), **integrazioni** in errore,

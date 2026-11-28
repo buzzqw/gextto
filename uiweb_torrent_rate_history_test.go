@@ -73,7 +73,7 @@ func TestTorrentSpeedViewFrom(t *testing.T) {
 		{At: now.Add(-time.Minute), Down: 4 << 20, Up: 1 << 20},
 	}
 	v := v2TorrentSpeedViewFrom(samples, now)
-	if !v.HasData || v.DownPoints == "" || v.UpPoints == "" || v.DownArea == "" {
+	if !v.HasData || v.DownLine == "" || v.UpLine == "" || v.DownArea == "" || v.UpArea == "" {
 		t.Fatalf("chart not drawn: %+v", v)
 	}
 	if v.PeakDown != "4.0 MB/s" && !strings.Contains(v.PeakDown, "4") {
@@ -163,7 +163,7 @@ func TestV2DetailAvailabilityAndSpeedTabs(t *testing.T) {
 	state.rate_history.torrents.record(now.Add(-time.Minute), []models.TorrentView{{Hash: hash, DownloadRate: 1 << 20}})
 	state.rate_history.torrents.record(now, []models.TorrentView{{Hash: hash, DownloadRate: 2 << 20}})
 	_, body = v2Request(t, server, http.MethodGet, "/downloads/detail/panel?hash="+hash+"&tab=speed", nil)
-	if !strings.Contains(body, "traffic-chart") || !strings.Contains(body, "polyline") {
+	if !strings.Contains(body, "traffic-chart") || !strings.Contains(body, `fill="url(#v2-torrent-traffic-down)"`) {
 		t.Fatalf("speed tab with history did not draw the chart:\n%s", body)
 	}
 }

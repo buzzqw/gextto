@@ -37,6 +37,11 @@ const (
 	// second flowing even when nothing is transferring, and drawing that as a
 	// curve is just noise. Anything under 1 KiB/s is shown as 0.
 	rateNoiseFloor = 1024
+	// trafficMinScale is the lowest top the charts scale to. Below it, the
+	// few KB/s of eD2k and DHT chatter would fill the chart as tall spikes:
+	// with the floor they stay a thin line at the bottom, while the figures
+	// in the legend still give the exact rates.
+	trafficMinScale = 256 << 10
 )
 
 // rateSample is one point of the history: the summed engine rates at a
@@ -166,12 +171,15 @@ type v2TrafficView struct {
 	HasData bool
 	// Idle: every sample of the window is zero. The page shows one line
 	// instead of a tall empty chart and zero peaks.
-	Idle        bool
-	Width       int
-	Height      int
-	DownPoints  string
+	Idle   bool
+	Width  int
+	Height int
+	// DownLine/UpLine are smooth SVG paths; the areas close them on the
+	// baseline for the shaded fill under each curve.
+	DownLine    string
 	DownArea    string
-	UpPoints    string
+	UpLine      string
+	UpArea      string
 	HasLimit    bool
 	Auto        bool
 	LimitY      string
@@ -187,8 +195,8 @@ type v2TrafficView struct {
 	TorrentUp   string
 	HasEd2k     bool
 	// eD2k (aMule) keeps its own dashed lines and figures under the total.
-	Ed2kDownPoints  string
-	Ed2kUpPoints    string
+	Ed2kDownLine    string
+	Ed2kUpLine      string
 	CurrentEd2kDown string
 	CurrentEd2kUp   string
 }
@@ -261,53 +269,35 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	if limitBytes > 0 && uint64(limitBytes) > top {
 		top = uint64(limitBytes)
 	}
-	if top == 0 {
-		top = 1024 // 1 KiB/s: a flat baseline instead of a division by zero.
+	if top < trafficMinScale {
+		top = trafficMinScale
 	}
 	scale := float64(top) * 1.15
 
 	height := float64(trafficChartHeight)
-	xOf := func(at time.Time) float64 {
-		frac := at.Sub(start).Seconds() / rateHistoryWindow.Seconds()
-		if frac < 0 {
-			frac = 0
-		} else if frac > 1 {
-			frac = 1
-		}
-		return frac * float64(trafficChartWidth)
-	}
-	yOf := func(value uint64) float64 {
-		if scale <= 0 {
-			return height
-		}
-		return height - (float64(value)/scale)*height
-	}
+	xOf := trafficXOf(start)
+	yOf := func(value uint64) float64 { return height - (float64(value)/scale)*height }
 
-	var downPoints, upPoints, ed2kDownPoints, ed2kUpPoints strings.Builder
-	firstX, lastX := xOf(samples[0].At), 0.0
+	ats := make([]time.Time, len(samples))
+	downs := make([]uint64, len(samples))
+	ups := make([]uint64, len(samples))
+	ed2kDowns := make([]uint64, len(samples))
+	ed2kUps := make([]uint64, len(samples))
 	for index, sample := range samples {
-		if index > 0 {
-			downPoints.WriteByte(' ')
-			upPoints.WriteByte(' ')
-			ed2kDownPoints.WriteByte(' ')
-			ed2kUpPoints.WriteByte(' ')
-		}
-		x := xOf(sample.At)
-		lastX = x
-		downPoints.WriteString(svgPoint(x, yOf(v2SampleDown(sample))))
-		upPoints.WriteString(svgPoint(x, yOf(v2SampleUp(sample))))
-		ed2kDownPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Ed2kDown))))
-		ed2kUpPoints.WriteString(svgPoint(x, yOf(v2RateOrZero(sample.Ed2kUp))))
+		ats[index] = sample.At
+		downs[index] = v2SampleDown(sample)
+		ups[index] = v2SampleUp(sample)
+		ed2kDowns[index] = v2RateOrZero(sample.Ed2kDown)
+		ed2kUps[index] = v2RateOrZero(sample.Ed2kUp)
 	}
-	view.DownPoints = downPoints.String()
-	view.UpPoints = upPoints.String()
+	downCurve := trafficCurve(ats, downs, xOf, yOf)
+	upCurve := trafficCurve(ats, ups, xOf, yOf)
+	view.DownLine, view.DownArea = svgCurve(downCurve), svgCurveArea(downCurve, height)
+	view.UpLine, view.UpArea = svgCurve(upCurve), svgCurveArea(upCurve, height)
 	if view.HasEd2k {
-		view.Ed2kDownPoints = ed2kDownPoints.String()
-		view.Ed2kUpPoints = ed2kUpPoints.String()
+		view.Ed2kDownLine = svgCurve(trafficCurve(ats, ed2kDowns, xOf, yOf))
+		view.Ed2kUpLine = svgCurve(trafficCurve(ats, ed2kUps, xOf, yOf))
 	}
-	// The area starts under the first sample: the time before it has no data,
-	// and closing it at the left edge drew a ramp from zero.
-	view.DownArea = svgNumber(firstX) + "," + svgNumber(height) + " " + view.DownPoints + " " + svgNumber(lastX) + "," + svgNumber(height)
 
 	view.PeakDown = logging.HumanRate(saturatingInt64(peakDown))
 	view.PeakUp = logging.HumanRate(saturatingInt64(peakUp))
@@ -321,9 +311,102 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 	return view
 }
 
-// svgPoint formats a coordinate pair for a polyline.
+// svgPoint formats a coordinate pair.
 func svgPoint(x, y float64) string {
 	return svgNumber(x) + "," + svgNumber(y)
+}
+
+// svgXY is one point of a chart curve, in SVG coordinates.
+type svgXY struct{ X, Y float64 }
+
+// trafficXOf maps a time inside the window to the chart's X axis.
+func trafficXOf(start time.Time) func(time.Time) float64 {
+	return func(at time.Time) float64 {
+		frac := math.Min(math.Max(at.Sub(start).Seconds()/rateHistoryWindow.Seconds(), 0), 1)
+		return frac * float64(trafficChartWidth)
+	}
+}
+
+// trafficCurve turns a rate series into the points of a calm curve: two
+// samples are averaged into one point (20 s apart, half the path to draw),
+// then each point is averaged with its neighbours, so a single burst of a few
+// seconds becomes a soft bump instead of a spike.
+func trafficCurve(ats []time.Time, values []uint64, xOf func(time.Time) float64, yOf func(uint64) float64) []svgXY {
+	type bucket struct {
+		at    float64
+		value float64
+	}
+	buckets := make([]bucket, 0, (len(values)+1)/2)
+	for index := 0; index < len(values); index += 2 {
+		end := index + 2
+		if end > len(values) {
+			end = len(values)
+		}
+		var x, sum float64
+		for j := index; j < end; j++ {
+			x += xOf(ats[j])
+			sum += float64(values[j])
+		}
+		count := float64(end - index)
+		buckets = append(buckets, bucket{at: x / count, value: sum / count})
+	}
+	points := make([]svgXY, len(buckets))
+	for index := range buckets {
+		var sum, count float64
+		for j := index - 1; j <= index+1; j++ {
+			if j >= 0 && j < len(buckets) {
+				sum += buckets[j].value
+				count++
+			}
+		}
+		points[index] = svgXY{X: buckets[index].at, Y: yOf(uint64(sum / count))}
+	}
+	return points
+}
+
+// svgCurve draws a smooth path through the points (Catmull-Rom turned into
+// cubic Béziers). Each control point is kept within the height of its own
+// segment, so the curve never dips under the baseline or rises above a peak
+// that was not measured.
+func svgCurve(points []svgXY) string {
+	if len(points) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(points) * 32)
+	b.WriteString("M")
+	b.WriteString(svgPoint(points[0].X, points[0].Y))
+	clamp := func(value, a, c float64) float64 {
+		low, high := math.Min(a, c), math.Max(a, c)
+		return math.Min(math.Max(value, low), high)
+	}
+	for index := 0; index+1 < len(points); index++ {
+		p0 := points[max(index-1, 0)]
+		p1, p2 := points[index], points[index+1]
+		p3 := points[min(index+2, len(points)-1)]
+		c1x := clamp(p1.X+(p2.X-p0.X)/6, p1.X, p2.X)
+		c1y := clamp(p1.Y+(p2.Y-p0.Y)/6, p1.Y, p2.Y)
+		c2x := clamp(p2.X-(p3.X-p1.X)/6, p1.X, p2.X)
+		c2y := clamp(p2.Y-(p3.Y-p1.Y)/6, p1.Y, p2.Y)
+		b.WriteString(" C")
+		b.WriteString(svgPoint(c1x, c1y))
+		b.WriteByte(' ')
+		b.WriteString(svgPoint(c2x, c2y))
+		b.WriteByte(' ')
+		b.WriteString(svgPoint(p2.X, p2.Y))
+	}
+	return b.String()
+}
+
+// svgCurveArea closes the curve on the baseline for the shaded fill. It starts
+// under the first point: the time before it has no data, and closing it at the
+// left edge drew a ramp from zero.
+func svgCurveArea(points []svgXY, baseline float64) string {
+	if len(points) == 0 {
+		return ""
+	}
+	last := points[len(points)-1]
+	return svgCurve(points) + " L" + svgPoint(last.X, baseline) + " L" + svgPoint(points[0].X, baseline) + " Z"
 }
 
 // svgNumber formats a coordinate with one decimal, trimming the trailing ".0".

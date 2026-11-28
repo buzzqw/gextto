@@ -23,7 +23,8 @@ import (
 const sideBarCount = 20
 
 // v2SideBars turns the rate history of the last 30 minutes into bar heights in
-// percent of the highest one. Nothing is drawn until two samples exist.
+// percent of the highest one, never below 256 KB/s. Nothing is drawn until
+// two samples exist.
 func v2SideBars(s *AppState) []int {
 	if s == nil || s.rate_history == nil {
 		return nil
@@ -60,6 +61,9 @@ func v2SideBars(s *AppState) []int {
 		if averages[index] > top {
 			top = averages[index]
 		}
+	}
+	if top < trafficMinScale {
+		top = trafficMinScale // chatter stays at the bottom, as on the chart
 	}
 	bars := make([]int, sideBarCount)
 	for index, value := range averages {

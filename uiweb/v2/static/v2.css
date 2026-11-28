@@ -2438,8 +2438,8 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   #v2-page[data-view="search"] .view > .panel:nth-child(2) { order: 4; }
 }
 
-/* Dashboard "Traffico di rete": a server-rendered SVG sparkline of the last
-   half hour. No charting library: the two curves are coloured through the
+/* Dashboard "Traffico di rete": a server-rendered SVG chart of the last half
+   hour, smooth shaded curves. No charting library: the two curves are coloured through the
    theme tokens, strokes stay crisp at any width (non-scaling-stroke) and the
    numbers beside it carry the values for screen readers. */
 :is(.dashboard-traffic-panel, .detail-traffic) .traffic-legend {
@@ -2454,8 +2454,12 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
 :is(.dashboard-traffic-panel, .detail-traffic) .traffic-stat.down { color: var(--chart-down); }
 :is(.dashboard-traffic-panel, .detail-traffic) .traffic-stat.up { color: var(--chart-up); }
 :is(.dashboard-traffic-panel, .detail-traffic) .traffic-chart { width: 100%; height: 150px; display: block; }
-:is(.dashboard-traffic-panel, .detail-traffic) .traffic-area.down { fill: color-mix(in srgb, var(--chart-down) 18%, transparent); stroke: none; }
-:is(.dashboard-traffic-panel, .detail-traffic) .traffic-line { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
+:is(.dashboard-traffic-panel, .detail-traffic) .traffic-area { stroke: none; }
+/* Each curve fades from its colour into the panel, upload under download. */
+:is(.dashboard-traffic-panel, .detail-traffic) .traffic-stop.down { stop-color: var(--chart-down); stop-opacity: 0.38; }
+:is(.dashboard-traffic-panel, .detail-traffic) .traffic-stop.up { stop-color: var(--chart-up); stop-opacity: 0.3; }
+:is(.dashboard-traffic-panel, .detail-traffic) .traffic-stop.end { stop-opacity: 0.02; }
+:is(.dashboard-traffic-panel, .detail-traffic) .traffic-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 :is(.dashboard-traffic-panel, .detail-traffic) .traffic-line.down { stroke: var(--chart-down); }
 :is(.dashboard-traffic-panel, .detail-traffic) .traffic-line.up { stroke: var(--chart-up); }
 /* The solid curves are the whole traffic; aMule (eD2k) keeps dashed lines in

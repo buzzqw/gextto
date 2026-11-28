@@ -81,8 +81,8 @@ func TestV2TrafficViewBuildsPointsAndLimit(t *testing.T) {
 	if !view.HasData {
 		t.Fatal("expected HasData with 12 samples")
 	}
-	if view.DownPoints == "" || view.UpPoints == "" || view.DownArea == "" {
-		t.Fatalf("missing coordinates: down=%q up=%q area=%q", view.DownPoints, view.UpPoints, view.DownArea)
+	if view.DownLine == "" || view.UpLine == "" || view.DownArea == "" || view.UpArea == "" {
+		t.Fatalf("missing coordinates: down=%q up=%q area=%q", view.DownLine, view.UpLine, view.DownArea)
 	}
 	if !view.HasLimit {
 		t.Fatal("expected the configured limit line")
@@ -108,13 +108,12 @@ func TestV2TrafficViewAreaStartsAtTheFirstSample(t *testing.T) {
 		state.rate_history.add(rateSample{At: now.Add(time.Duration(i-6) * 10 * time.Second), Down: 4 << 20})
 	}
 	view := v2TrafficViewFrom(state)
-	first := strings.SplitN(view.DownArea, " ", 2)[0]
-	x, err := strconv.ParseFloat(strings.SplitN(first, ",", 2)[0], 64)
-	if err != nil || x < trafficChartWidth*0.9 {
-		t.Fatalf("area starts at %q, want under the first sample near the right edge", first)
+	first := curveAnchors(t, view.DownArea)[0]
+	if first.X < trafficChartWidth*0.9 {
+		t.Fatalf("area starts at %v, want under the first sample near the right edge", first)
 	}
-	if strings.HasPrefix(view.DownPoints, "0,") {
-		t.Fatalf("a sample older than the window was drawn: %q", view.DownPoints)
+	if strings.HasPrefix(view.DownLine, "M0,") {
+		t.Fatalf("a sample older than the window was drawn: %q", view.DownLine)
 	}
 }
 
@@ -200,9 +199,9 @@ func TestV2TrafficViewTreatsSubKibRatesAsZero(t *testing.T) {
 	if view.PeakDown != "0 B/s" || view.PeakUp != "0 B/s" {
 		t.Fatalf("sub-floor peaks = %q/%q, want 0 B/s", view.PeakDown, view.PeakUp)
 	}
-	for _, point := range strings.Fields(view.DownPoints) {
-		if !strings.HasSuffix(point, ","+strconv.Itoa(trafficChartHeight)) {
-			t.Fatalf("sub-floor point not on the baseline: %q in %q", point, view.DownPoints)
+	for _, point := range curveAnchors(t, view.DownLine) {
+		if point.Y != trafficChartHeight {
+			t.Fatalf("sub-floor point not on the baseline: %v in %q", point, view.DownLine)
 		}
 	}
 
@@ -240,11 +239,9 @@ func TestV2TrafficViewCurvesAreTheWholeTraffic(t *testing.T) {
 		t.Fatalf("scale = %q, want the download peak", view.ScaleLabel)
 	}
 	// The last point sits above the baseline proportionally to the total.
-	points := strings.Fields(view.DownPoints)
-	last := points[len(points)-1]
-	y, err := strconv.ParseFloat(strings.SplitN(last, ",", 2)[1], 64)
-	if err != nil || y >= trafficChartHeight {
-		t.Fatalf("last download point = %q (%v), want it lifted off the baseline", last, err)
+	points := curveAnchors(t, view.DownLine)
+	if last := points[len(points)-1]; last.Y >= trafficChartHeight {
+		t.Fatalf("last download point = %v, want it lifted off the baseline", last)
 	}
 	if view.CurrentEd2kDown != "" || view.CurrentEd2kUp != "" {
 		t.Fatalf("eD2k breakdown = %q/%q, want none while eD2k is off", view.CurrentEd2kDown, view.CurrentEd2kUp)
@@ -258,9 +255,10 @@ func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
 		HasData:     true,
 		Width:       trafficChartWidth,
 		Height:      trafficChartHeight,
-		DownPoints:  "0,160 600,0",
-		UpPoints:    "0,160 600,80",
-		DownArea:    "0,160 0,160 600,0 600,160",
+		DownLine:    "M0,160 C200,100 400,40 600,0",
+		DownArea:    "M0,160 C200,100 400,40 600,0 L600,160 L0,160 Z",
+		UpLine:      "M0,160 C200,120 400,100 600,80",
+		UpArea:      "M0,160 C200,120 400,100 600,80 L600,160 L0,160 Z",
 		HasLimit:    true,
 		LimitY:      "20",
 		LimitLabel:  "1.0 MB/s",
@@ -282,6 +280,9 @@ func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
 		`aria-label="Grafico del traffico totale di download e upload, ultimi 30 minuti"`,
 		`traffic-line down`,
 		`traffic-line up`,
+		`fill="url(#v2-traffic-down)"`,
+		`fill="url(#v2-traffic-up)"`,
+		`<linearGradient id="v2-traffic-up"`,
 		`traffic-limit`,
 		// The peaks of the window name themselves: next to the current rates
 		// an unlabelled 380.6 KB/s read as a second, contradictory upload
@@ -384,5 +385,116 @@ func TestV2TrafficViewIdleWindow(t *testing.T) {
 	state.rate_history.add(rateSample{At: now, Up: 64 * 1024})
 	if view := v2TrafficViewFrom(state); view.Idle {
 		t.Fatal("a window with traffic must draw the chart")
+	}
+}
+
+// curveAnchors reads the points a chart path passes through: the move-to and
+// the end point of each cubic segment (the control points are skipped), plus
+// the line-to corners that close an area.
+func curveAnchors(t *testing.T, d string) []svgXY {
+	t.Helper()
+	var points []svgXY
+	parse := func(pair string) svgXY {
+		parts := strings.SplitN(pair, ",", 2)
+		if len(parts) != 2 {
+			t.Fatalf("bad coordinate %q in %q", pair, d)
+		}
+		x, errX := strconv.ParseFloat(parts[0], 64)
+		y, errY := strconv.ParseFloat(parts[1], 64)
+		if errX != nil || errY != nil {
+			t.Fatalf("bad coordinate %q in %q", pair, d)
+		}
+		return svgXY{X: x, Y: y}
+	}
+	fields := strings.Fields(d)
+	for index := 0; index < len(fields); index++ {
+		field := fields[index]
+		switch {
+		case strings.HasPrefix(field, "M"), strings.HasPrefix(field, "L"):
+			points = append(points, parse(field[1:]))
+		case strings.HasPrefix(field, "C"):
+			if index+2 >= len(fields) {
+				t.Fatalf("truncated segment in %q", d)
+			}
+			points = append(points, parse(fields[index+2]))
+			index += 2
+		}
+	}
+	if len(points) == 0 {
+		t.Fatalf("no points in %q", d)
+	}
+	return points
+}
+
+// TestTrafficChartFloorsTheScaleAndSmoothsBursts: the eD2k and DHT chatter of
+// a few KB/s used to fill the chart as tall spikes, because the scale followed
+// the peak of the window. The scale now starts at 256 KB/s, a lone burst is
+// softened by the neighbours, and the curve never leaves the canvas.
+func TestTrafficChartFloorsTheScaleAndSmoothsBursts(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Settings == nil {
+		cfg.Settings = map[string]string{}
+	}
+	state := trafficTestState(&cfg)
+	now := time.Now()
+	for i := 0; i < 60; i++ {
+		up := uint64(0)
+		if i%7 == 0 {
+			up = 4710 // a chatter burst, 4.6 KB/s
+		}
+		state.rate_history.add(rateSample{At: now.Add(time.Duration(i-60) * rateSampleInterval), Ed2kUp: up})
+	}
+	view := v2TrafficViewFrom(state)
+	if view.PeakUp != "4.6 KB/s" {
+		t.Fatalf("peak = %q, want the real 4.6 KB/s in the legend", view.PeakUp)
+	}
+	if view.ScaleLabel != "256.0 KB/s" {
+		t.Fatalf("scale = %q, want the 256 KB/s floor", view.ScaleLabel)
+	}
+	for _, point := range curveAnchors(t, view.UpLine) {
+		if point.Y < trafficChartHeight-2 {
+			t.Fatalf("chatter lifted the curve to %v, want it within 2 px of the baseline", point)
+		}
+	}
+
+	// A real transfer above the floor still sets the scale, and a single
+	// burst is drawn lower than it was measured.
+	state = trafficTestState(&cfg)
+	for i := 0; i < 60; i++ {
+		down := uint64(1 << 20)
+		if i == 30 {
+			down = 8 << 20
+		}
+		state.rate_history.add(rateSample{At: now.Add(time.Duration(i-60) * rateSampleInterval), Down: down})
+	}
+	view = v2TrafficViewFrom(state)
+	if view.ScaleLabel != "8.0 MB/s" {
+		t.Fatalf("scale = %q, want the 8.0 MB/s peak", view.ScaleLabel)
+	}
+	scale := float64(8<<20) * 1.15
+	peakY := trafficChartHeight - float64(8<<20)/scale*trafficChartHeight
+	for _, point := range curveAnchors(t, view.DownArea) {
+		if point.Y <= peakY+1 || point.Y > trafficChartHeight || point.X < 0 || point.X > trafficChartWidth {
+			t.Fatalf("point %v: want a burst softened below y=%.1f and inside the canvas", point, peakY)
+		}
+	}
+}
+
+// TestSvgCurveStaysWithinEachSegment: the Bézier control points are kept in the
+// height of their own segment, so a jump from zero to a peak and back does not
+// overshoot under the baseline.
+func TestSvgCurveStaysWithinEachSegment(t *testing.T) {
+	d := svgCurve([]svgXY{{0, 160}, {10, 160}, {20, 0}, {30, 160}, {40, 160}})
+	fields := strings.Fields(d)
+	for _, field := range fields {
+		pair := strings.TrimLeft(field, "MC")
+		parts := strings.SplitN(pair, ",", 2)
+		y, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil || y < 0 || y > 160 {
+			t.Fatalf("coordinate %q leaves the 0..160 band in %q", field, d)
+		}
+	}
+	if svgCurve(nil) != "" || svgCurveArea(nil, 160) != "" {
+		t.Fatal("an empty series must draw nothing")
 	}
 }

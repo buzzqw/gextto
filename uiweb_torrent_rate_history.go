@@ -7,7 +7,6 @@ package gextto
 // at once instead of starting an empty graph.
 
 import (
-	"math"
 	"strings"
 	"sync"
 	"time"
@@ -185,9 +184,10 @@ type v2TorrentSpeedView struct {
 	Idle       bool
 	Width      int
 	Height     int
-	DownPoints string
+	DownLine   string
 	DownArea   string
-	UpPoints   string
+	UpLine     string
+	UpArea     string
 	PeakDown   string
 	PeakUp     string
 	AvgDown    string
@@ -217,7 +217,7 @@ func v2TorrentSpeedViewFrom(samples []torrentRate, now time.Time) v2TorrentSpeed
 		sumDown += sample.Down
 		sumUp += sample.Up
 	}
-	top := uint64(1024)
+	top := uint64(trafficMinScale)
 	if peakDown > top {
 		top = peakDown
 	}
@@ -226,23 +226,18 @@ func v2TorrentSpeedViewFrom(samples []torrentRate, now time.Time) v2TorrentSpeed
 	}
 	scale := float64(top) * 1.15
 	height := float64(trafficChartHeight)
-	xOf := func(at time.Time) float64 {
-		frac := math.Min(math.Max(at.Sub(start).Seconds()/rateHistoryWindow.Seconds(), 0), 1)
-		return frac * float64(trafficChartWidth)
-	}
+	xOf := trafficXOf(start)
 	yOf := func(value uint64) float64 { return height - float64(value)/scale*height }
-	var down, up strings.Builder
+	ats := make([]time.Time, len(samples))
+	downs := make([]uint64, len(samples))
+	ups := make([]uint64, len(samples))
 	for index, sample := range samples {
-		if index > 0 {
-			down.WriteByte(' ')
-			up.WriteByte(' ')
-		}
-		x := xOf(sample.At)
-		down.WriteString(svgPoint(x, yOf(sample.Down)))
-		up.WriteString(svgPoint(x, yOf(sample.Up)))
+		ats[index], downs[index], ups[index] = sample.At, sample.Down, sample.Up
 	}
-	view.DownPoints, view.UpPoints = down.String(), up.String()
-	view.DownArea = svgNumber(xOf(samples[0].At)) + "," + svgNumber(height) + " " + view.DownPoints + " " + svgNumber(xOf(samples[len(samples)-1].At)) + "," + svgNumber(height)
+	downCurve := trafficCurve(ats, downs, xOf, yOf)
+	upCurve := trafficCurve(ats, ups, xOf, yOf)
+	view.DownLine, view.DownArea = svgCurve(downCurve), svgCurveArea(downCurve, height)
+	view.UpLine, view.UpArea = svgCurve(upCurve), svgCurveArea(upCurve, height)
 	count := uint64(len(samples))
 	view.PeakDown = logging.HumanRate(saturatingInt64(peakDown))
 	view.PeakUp = logging.HumanRate(saturatingInt64(peakUp))

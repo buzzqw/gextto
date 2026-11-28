@@ -202,6 +202,12 @@
 {{end}}
 {{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{tr .Message}}</span>{{else}}<span class="badge ok">{{tr .Message}}</span>{{end}}{{end}}
 
+{{/* The vertical shading under the two traffic curves, shared by the
+     Dashboard chart and a torrent's Speed tab; the argument prefixes the ids. */}}
+{{define "v2_traffic_fills"}}<defs>
+      <linearGradient id="{{.}}-down" x1="0" y1="0" x2="0" y2="1"><stop class="traffic-stop down" offset="0" /><stop class="traffic-stop down end" offset="1" /></linearGradient>
+      <linearGradient id="{{.}}-up" x1="0" y1="0" x2="0" y2="1"><stop class="traffic-stop up" offset="0" /><stop class="traffic-stop up end" offset="1" /></linearGradient>
+    </defs>{{end}}
 {{define "v2_live_traffic"}}
 <div id="v2-live-traffic" class="traffic">
   <div class="traffic-legend">
@@ -215,12 +221,14 @@
   {{if .Idle}}<p class="muted traffic-idle">{{tr "Nessun trasferimento negli ultimi 30 minuti."}}</p>
   {{else if .HasData}}
   <svg class="traffic-chart" viewBox="0 0 {{.Width}} {{.Height}}" preserveAspectRatio="none" role="img" aria-label="{{tr "Grafico del traffico totale di download e upload, ultimi 30 minuti"}}">
-    <polygon class="traffic-area down" points="{{.DownArea}}" />
+    {{template "v2_traffic_fills" "v2-traffic"}}
+    <path class="traffic-area up" d="{{.UpArea}}" fill="url(#v2-traffic-up)" />
+    <path class="traffic-area down" d="{{.DownArea}}" fill="url(#v2-traffic-down)" />
     {{if .HasLimit}}<line class="traffic-limit" x1="0" y1="{{.LimitY}}" x2="{{.Width}}" y2="{{.LimitY}}" />{{end}}
-    <polyline class="traffic-line up" points="{{.UpPoints}}" />
-    <polyline class="traffic-line down" points="{{.DownPoints}}" />
-    {{if .Ed2kDownPoints}}<polyline class="traffic-line ed2k-up" points="{{.Ed2kUpPoints}}" />
-    <polyline class="traffic-line ed2k-down" points="{{.Ed2kDownPoints}}" />{{end}}
+    <path class="traffic-line up" d="{{.UpLine}}" />
+    <path class="traffic-line down" d="{{.DownLine}}" />
+    {{if .Ed2kDownLine}}<path class="traffic-line ed2k-up" d="{{.Ed2kUpLine}}" />
+    <path class="traffic-line ed2k-down" d="{{.Ed2kDownLine}}" />{{end}}
   </svg>
   <div class="traffic-axis"><span>0</span><span>{{tr .ScaleLabel}}</span></div>
   {{else}}<p class="muted">{{tr "Raccolta dati in corso…"}}</p>{{end}}
