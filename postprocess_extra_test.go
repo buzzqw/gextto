@@ -157,6 +157,98 @@ func TestRenameMovieWithMockedTmdb(t *testing.T) {
 	}
 }
 
+// The official title of a monitored film comes from its own TMDB id, never
+// from the first result of a search by name: searching "The Beast" (2026)
+// returns "Heart of the Beast - Nel profondo selvaggio" first, and the file of
+// one film was named after the other.
+func TestRenameMovieUsesTheMonitoredTmdbIDNotTheFirstSearchHit(t *testing.T) {
+	searches := 0
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/movie/1185344":
+			tmdbWriteJSON(t, w, `{"id":1185344,"title":"The Beast","original_title":"The Beast","release_date":"2026-10-08"}`)
+		case "/search/movie":
+			searches++
+			tmdbWriteJSON(t, w, `{"results":[
+				{"id":1263337,"title":"Heart of the Beast - Nel profondo selvaggio","original_title":"Heart of the Beast","release_date":"2026-09-23"},
+				{"id":1185344,"title":"The Beast","original_title":"The Beast","release_date":"2026-10-08"}]}`)
+		default:
+			t.Errorf("unexpected TMDB path %q", r.URL.Path)
+			tmdbWriteJSON(t, w, `{"results":[]}`)
+		}
+	})
+
+	dir := t.TempDir()
+	source := filepath.Join(dir, "Beast.Race.2026.1080p.ITA-POR-ENG.MULTI.WEBRip.x265.AAC-V3SP4EV3R.mkv")
+	writeFile(t, source, validMKV(4096))
+
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	cfg.RenameEpisodes = true
+	cfg.RenameFormat = "custom"
+	cfg.RenameMovieTemplate = "{Titolo} ({Anno})"
+	cfg.Movies = []MovieConfig{{Name: "The Beast", Year: "2026", TmdbID: "1185344", Enabled: true}}
+	key := "test-key"
+	year := int64(2026)
+	release := &models.Release{
+		Title:   "The Beast",
+		Quality: models.Quality{Resolution: "1080p", Source: "webrip", Codec: "h265"},
+		Kind:    "movie",
+		Year:    &year,
+	}
+
+	renamed, err := RenameMovie(context.Background(), source, release, &cfg, NewTmdbClientWithLanguage(&key, "it-IT"))
+	if err != nil {
+		t.Fatalf("RenameMovie: %v", err)
+	}
+	if want := "The Beast (2026).mkv"; filepath.Base(renamed) != want {
+		t.Fatalf("renamed to %q, want %q", filepath.Base(renamed), want)
+	}
+	if searches != 0 {
+		t.Fatalf("the film's TMDB id is authoritative, but %d searches by name were made", searches)
+	}
+}
+
+// A release that is not in the list falls back to the search, and among its
+// results it takes one that really carries the release's name: the first hit
+// can be another film that only shares a word with it.
+func TestRenameMovieSkipsASearchHitOfAnotherFilm(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search/movie" {
+			t.Errorf("unexpected TMDB path %q", r.URL.Path)
+		}
+		tmdbWriteJSON(t, w, `{"results":[
+			{"id":1263337,"title":"Heart of the Beast - Nel profondo selvaggio","original_title":"Heart of the Beast","release_date":"2026-09-23"},
+			{"id":1185344,"title":"The Beast","original_title":"The Beast","release_date":"2026-10-08"}]}`)
+	})
+
+	dir := t.TempDir()
+	source := filepath.Join(dir, "Beast.Race.2026.1080p.WEBRip.mkv")
+	writeFile(t, source, validMKV(4096))
+
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	cfg.RenameEpisodes = true
+	cfg.RenameFormat = "custom"
+	cfg.RenameMovieTemplate = "{Titolo} ({Anno})"
+	key := "test-key"
+	year := int64(2026)
+	release := &models.Release{
+		Title:   "The Beast",
+		Quality: models.Quality{Resolution: "1080p", Source: "webrip"},
+		Kind:    "movie",
+		Year:    &year,
+	}
+
+	renamed, err := RenameMovie(context.Background(), source, release, &cfg, NewTmdbClientWithLanguage(&key, "it-IT"))
+	if err != nil {
+		t.Fatalf("RenameMovie: %v", err)
+	}
+	if want := "The Beast (2026).mkv"; filepath.Base(renamed) != want {
+		t.Fatalf("renamed to %q, want %q", filepath.Base(renamed), want)
+	}
+}
+
 func repeatTest(value string, count int) string {
 	out := ""
 	for i := 0; i < count; i++ {

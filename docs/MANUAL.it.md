@@ -671,6 +671,17 @@ parità di titolo vince il nome del film rispetto a un titolo alternativo. Le
 **corrispondenze in archivio** della scheda mostrano solo le release che
 Gextto riconoscerebbe davvero.
 
+Il titolo deve anche **finire** dove finiscono le sue parole: dopo l'ultima
+parola del titolo la release prosegue con un tag tecnico — l'anno, la
+risoluzione, la sorgente, il codec, la lingua, la versione — oppure con un altro
+titolo dello stesso film, come nelle release che scrivono il nome italiano e
+quello originale uno dopo l'altro. Una parola che appartiene al nome di un altro
+film chiude il confronto: un film intitolato «Film A» non prende più la release
+«Film A Altro Titolo 2026», che è un film diverso, e un seguito come «Film A 2»
+resta un altro film. Senza questo confine bastava che il titolo senza articolo
+fosse la prima parola del nome di un'altra release perché Gextto la scaricasse
+al posto del film scelto.
+
 ### La scheda del film
 
 Mostra locandina, trama, cast, i **migliori risultati** trovati nelle sorgenti
@@ -1156,6 +1167,13 @@ il modello degli episodi con i tag di qualità, aggiungili anche a quello dei
 film, che non li prende da solo. Un token senza
 valore (un HDR sconosciuto, un anno mancante) sparisce insieme alle sue
 parentesi.
+
+Il `{Titolo}` di un film monitorato è il nome che hai in elenco, che Gextto
+conferma con la scheda TMDB del film quando ne ha l'identificativo: non è mai il
+primo risultato di una ricerca per nome, quindi un film il cui nome è anche
+l'inizio del nome di un altro film non può essere rinominato con quello. Un file
+accodato a mano per un film che non è in elenco ripiega sulla ricerca, e prende
+un risultato che porta davvero il nome della release.
 
 I tag tecnici non vengono presi solo dal nome della release: prima di
 rinominare Gextto legge il file con `mediainfo` (o, se manca, con `ffprobe`) e

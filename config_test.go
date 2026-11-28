@@ -630,6 +630,71 @@ func TestMovieMatchingComparesTheWholeTitleAtTheStart(t *testing.T) {
 	}
 }
 
+// The title matched must end there: what follows it is a technical tag or
+// stops the name. Without that boundary a film whose article-less title is the
+// first word of another film's took that film's releases: "The Beast" (the
+// article is dropped, so the title is one word) matched
+// "Beast.Race.2026.1080p.ITA-POR-ENG…", a different film, and it was
+// downloaded in its place.
+func TestMovieMatchingRequiresTheTitleToEndOnAReleaseTag(t *testing.T) {
+	year2026 := int64(2026)
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{Name: "The Beast", Year: "2026", Enabled: true}}
+	// Another film whose name opens with the same word, or a longer name of
+	// the same word: none of them is "The Beast".
+	for _, title := range []string{
+		"Beast.Race.2026.1080p.ITA-POR-ENG.MULTI.WEBRip.x265.AAC-V3SP4EV3R.mkv",
+		"Heart.of.the.Beast.2026.1080p.WEB-DL",
+		"The.Beast.Within.2026.1080p.WEB-DL",
+		"Beast.2.2026.1080p.WEB-DL",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got != nil {
+			t.Errorf("release %q matched %q: the title does not end there", title, got.Name)
+		}
+	}
+	// The film's own releases keep matching, whatever tag follows the title.
+	for _, title := range []string{
+		"The.Beast.2026.1080p.WEB-DL",
+		"The Beast (2026) WEB-DL [H.264/1080p]",
+		"The Beast 2026 MULTi 1080p WEB H264 SUPPLY",
+		"Beast 2026 iTALiAN MD 1080p HDTS x264",
+		"THE BEAST (2026) 720p TELESYNC HEVC",
+		"The Beast (2026) HQ HDRip - x264 - [Tel Tam Hin]",
+		"The.Beast.2026.Extended.1080p.BluRay.x264-GRP",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got == nil || got.Name != "The Beast" {
+			t.Errorf("release %q matched %v, want The Beast", title, got)
+		}
+	}
+}
+
+// A release that spells two titles of the same film one after the other
+// ("local title - original title") keeps matching: the words after the title
+// are another title of the film, not a continuation of its name.
+func TestMovieMatchingAcceptsASecondTitleOfTheSameFilm(t *testing.T) {
+	year2014 := int64(2014)
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{
+		Name:          "Vita da vampiro",
+		OriginalTitle: "What We Do in the Shadows",
+		Year:          "2014",
+		Enabled:       true,
+	}}
+	for _, title := range []string{
+		"Vita.da.vampiro.What.We.Do.in.the.Shadows.2014.1080p.WEB-DL",
+		"Vita da vampiro - What We Do in the Shadows (2014) AC3 5.1 ITA ENG 1080p",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2014); got == nil {
+			t.Errorf("release %q did not match its own film", title)
+		}
+	}
+	// A word that is neither a tag nor another title of the film closes the
+	// match: it belongs to the name of another film.
+	if got := cfg.FindMovieMatch("Vita.da.vampiro.Racconti.2014.1080p", &year2014); got != nil {
+		t.Errorf("release with another film's word matched %q", got.Name)
+	}
+}
+
 // A film monitored under a localized title must be searched under the names
 // that matter: the monitored name, the original title (the original language
 // of the film), the title in the language chosen for it and the English one.

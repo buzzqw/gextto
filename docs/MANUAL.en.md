@@ -661,6 +661,17 @@ not count, and at the same length the film's own name wins over an alternative
 title. The page's **archive matches** show only the releases Gextto would really
 take.
 
+The title must also **end** where its words end: after the last word of the
+title the release goes on with a technical tag — the year, the resolution, the
+source, the codec, the language, the edition — or with another title of the same
+film, as in the releases that spell the local and the original name one after
+the other. A word that belongs to the name of another film closes the
+comparison: a film titled "Film A" no longer takes the release
+"Film A Another Title 2026", which is a different film, and a sequel such as
+"Film A 2" stays another film. Without that boundary it was enough for the
+article-less title to be the first word of another release's name for Gextto to
+download it in place of the chosen film.
+
 ### The movie page
 
 It shows poster, plot, cast, the **best results** found in the sources and the
@@ -1132,6 +1143,13 @@ so a library already renamed keeps its names: if you give the episode template
 the quality tags, add them to the movie template too, which does not take them
 on its own. A token with no value (an
 unknown HDR, a missing year) disappears together with its brackets.
+
+The `{Titolo}` of a monitored film is the name in your list, which Gextto confirms
+with the film's own TMDB entry when it has an identifier: it is never the first
+result of a search by name, so a film whose name is also the beginning of another
+film's name cannot be renamed after the other one. A file queued by hand for a
+film that is not in the list falls back to the search, taking a result that
+really carries the release's own name.
 
 The technical tags are not taken from the release name alone: before renaming,
 Gextto reads the file with `mediainfo` (or, when missing, `ffprobe`) and uses the

@@ -2054,6 +2054,9 @@ func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMat
 		if !usable || !wordsOpenTitle(releaseWords, words) {
 			return
 		}
+		if !titleEndsOnReleaseTag(movie, releaseWords[len(words):]) {
+			return
+		}
 		candidate := movieTitleMatch{words: len(words), tier: tier}
 		if candidate.betterThan(best) {
 			best = candidate
@@ -2157,6 +2160,107 @@ func wordsOpenTitle(release, title []string) bool {
 		}
 	}
 	return true
+}
+
+// titleEndsOnReleaseTag reports whether the matched title really ends where
+// its words end: the release stops there, or the next word is a technical tag
+// or a second title of the same film.
+//
+// Without this boundary a film whose (article-less) title is the first word of
+// another film's name took that film's releases: "The Beast" reduced to
+// "beast" and matched "Beast.Race.2026…", a different film, which was then
+// downloaded in its place. A release ends a title on a separator — a year, a
+// resolution, a source, a codec, a language, an edition — never in the middle
+// of a name.
+func titleEndsOnReleaseTag(movie *MovieConfig, rest []string) bool {
+	if len(rest) == 0 {
+		return true
+	}
+	if isReleaseTagWord(rest[0]) {
+		return true
+	}
+	return movieTitleOpensAnotherTitle(movie, rest)
+}
+
+// movieTitleOpensAnotherTitle reports whether the words left after a matched
+// title open another title of the same film. A release can spell two of them
+// one after the other — "Vita da vampiro - What We Do in the Shadows (2014)" —
+// so the second one is a boundary like a tag is.
+func movieTitleOpensAnotherTitle(movie *MovieConfig, words []string) bool {
+	consider := func(value string) bool {
+		titleWords, usable := libraryTitleWords(value)
+		return usable && wordsOpenTitle(words, titleWords)
+	}
+	if consider(movie.Name) || consider(movie.OriginalTitle) {
+		return true
+	}
+	for _, alias := range movie.Aliases {
+		if consider(alias) {
+			return true
+		}
+	}
+	for _, title := range movie.TitleTranslations {
+		if consider(title) {
+			return true
+		}
+	}
+	return false
+}
+
+// isReleaseTagWord reports whether a release word is a technical tag, the kind
+// of token that closes a title in a release name. It is broader than
+// isLeadingReleaseTag, which only skips the tags an indexer puts in front of a
+// title: every tag a release can carry after a title also closes it.
+func isReleaseTagWord(word string) bool {
+	if isLeadingReleaseTag(word) || isReleaseSuffixWord(word) {
+		return true
+	}
+	// A tag that carries a number: a resolution ("1080p"), a codec ("h264"),
+	// an audio one ("dd5", "aac2"), a bit depth ("10bit"). A bare number is
+	// not one: "Beast 2" is the second film, not the first one.
+	if len(word) >= 3 && hasASCIIDigit(word) {
+		return true
+	}
+	switch word {
+	// High dynamic range and picture shape.
+	case "hdr", "hdr10", "sdr", "dv", "dolby", "vision", "3d", "hfr", "hd", "fhd",
+		"hdready", "4k", "uhd":
+		return true
+	// Source, release kind and streaming service.
+	case "dl", "webdl", "webrip", "webmux", "dlmux", "bluray", "bdrip", "brrip",
+		"bdremux", "remux", "hdtv", "pdtv", "dvd", "dvdrip", "dvdscr", "hdrip",
+		"rip", "cam", "camrip", "hdcam", "ts", "tc", "telesync", "telecine",
+		"scr", "screener", "satrip", "iptv", "vod", "amzn", "dsnp", "atvp", "nf",
+		"hmax", "max", "pcok", "stan", "itunes", "vudu", "hq":
+		return true
+	// Video codec.
+	case "x264", "x265", "h264", "h265", "hevc", "avc", "av1", "vp9", "xvid",
+		"divx", "mpeg2", "mpeg":
+		return true
+	// Audio codec.
+	case "aac", "aac2", "aac5", "ac3", "eac3", "dd", "dd2", "dd5", "ddp", "ddp2",
+		"ddp5", "dts", "dtshd", "truehd", "atmos", "flac", "mp3", "opus", "lpcm",
+		"pcm", "dual":
+		return true
+	// Language names spelled in full.
+	case "italian", "italiano", "english", "inglese", "spanish", "german",
+		"french", "russian", "polish", "portuguese", "chinese", "japanese",
+		"korean", "dutch", "norwegian", "swedish", "danish", "finnish",
+		"turkish", "hindi", "arabic", "hebrew", "czech", "hungarian", "romanian",
+		"greek", "thai", "indonesian", "malay", "multi", "multisub", "sub",
+		"subs", "subbed", "dubbed":
+		return true
+	// Edition and release revision.
+	case "extended", "theatrical", "unrated", "remastered", "restored",
+		"director", "directors", "cut", "imax", "criterion", "special",
+		"collectors", "anniversary", "proper", "repack", "rerip", "real",
+		"internal", "limited", "uncut":
+		return true
+	// Container extension.
+	case "mkv", "mp4", "avi", "m4v", "wmv", "mov":
+		return true
+	}
+	return false
 }
 
 // isLeadingReleaseTag reports whether a word is a tag an indexer puts before a

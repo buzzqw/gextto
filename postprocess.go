@@ -1731,6 +1731,71 @@ func movieNameStem(cfg *Config, title, year string, quality models.Quality, audi
 	}
 }
 
+// officialMovieTitle is the title the library names a film with. When the film
+// is monitored its own TMDB id is authoritative: a search by name returns the
+// first fuzzy hit, and searching "The Beast" (2026) returns another film
+// ("Heart of the Beast - Nel profondo selvaggio"), which named the file after
+// the wrong movie. A release that is not in the list falls back to the search,
+// keeping the first result that really carries the release's own name.
+func officialMovieTitle(ctx context.Context, tmdb *TmdbClient, configuredName string, year *int64, tmdbID string) (string, error) {
+	if !tmdb.Configured() {
+		return configuredName, nil
+	}
+	if id := strings.TrimSpace(tmdbID); id != "" {
+		details, err := tmdb.MovieDetails(ctx, id)
+		if err != nil {
+			return "", err
+		}
+		if details != nil && details.Title != nil && tmdbTitleFitsName(*details.Title, configuredName) {
+			return *details.Title, nil
+		}
+		return configuredName, nil
+	}
+	results, err := tmdb.SearchMovies(ctx, configuredName)
+	if err != nil {
+		return "", err
+	}
+	if picked := pickSearchedMovieTitle(results, configuredName, year); picked != "" {
+		return picked, nil
+	}
+	return configuredName, nil
+}
+
+// pickSearchedMovieTitle chooses, among the search results, the title of the
+// film the release names: none of the others can rename it, because the first
+// hit is often another film that only shares a word with it. The year settles
+// the ties when both sides carry one.
+func pickSearchedMovieTitle(results []TmdbItem, name string, year *int64) string {
+	fallback := ""
+	for _, item := range results {
+		if item.Title == nil || !tmdbTitleFitsName(*item.Title, name) {
+			continue
+		}
+		if year != nil && item.ReleaseDate != nil && len(*item.ReleaseDate) >= 4 {
+			if itemYear, err := strconv.ParseInt((*item.ReleaseDate)[:4], 10, 64); err == nil && absInt64(itemYear-*year) <= 1 {
+				return *item.Title
+			}
+		}
+		if fallback == "" {
+			fallback = *item.Title
+		}
+	}
+	return fallback
+}
+
+// tmdbTitleFitsName reports whether a title TMDB returned describes the name a
+// release carries: one opens the other, so "The Veil" fits a release named
+// "The Veil 2024 1080p WEB-DL" while "Heart of the Beast" does not fit
+// "The Beast".
+func tmdbTitleFitsName(title, name string) bool {
+	titleWords, titleOK := libraryTitleWords(title)
+	nameWords, nameOK := libraryTitleWords(name)
+	if !titleOK || !nameOK {
+		return false
+	}
+	return wordsOpenTitle(titleWords, nameWords) || wordsOpenTitle(nameWords, titleWords)
+}
+
 // RenameMovie renames a movie file according to the configured template and
 // returns the new path, or "" when there is nothing to do (implementation of
 // `rename_movie`).
@@ -1746,18 +1811,14 @@ func RenameMovie(
 	}
 	configured := release.Title
 	configuredName := strings.ReplaceAll(configured, ".", " ")
+	tmdbID := ""
 	if movie := cfg.FindMovieMatchManual(release.Title, release.Year); movie != nil {
 		configuredName = movie.Name
+		tmdbID = movie.TmdbID
 	}
-	officialTitle := configuredName
-	if tmdb != nil {
-		tmdbItem, err := tmdb.SearchMovie(ctx, configuredName, release.Year)
-		if err != nil {
-			return "", err
-		}
-		if tmdbItem != nil && tmdbItem.Title != nil {
-			officialTitle = *tmdbItem.Title
-		}
+	officialTitle, err := officialMovieTitle(ctx, tmdb, configuredName, release.Year, tmdbID)
+	if err != nil {
+		return "", err
 	}
 	officialYear := release.Year
 	files, err := VideoFiles(path)
