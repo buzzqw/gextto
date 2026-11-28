@@ -919,9 +919,9 @@ the engine downloaded and uploaded since it started.
 - **On several rows**: tick the torrents and use the selection bar: **Pause**,
   **Resume**, **Check again**, **Tag** (assign, create or remove a tag),
   **Remove from session**.
-- **Tools**: **Clean completed** (removes torrents that finished seeding),
-  **Orphaned files…**, **Refresh every 5 s** and the link to **Removal after
-  seeding**.
+- **Tools**: **Clean completed** (removes torrents that finished seeding and
+  completed or failed HTTP downloads; files are kept), **Orphaned files…**,
+  **Refresh every 5 s** and the link to **Removal after seeding**.
 
 **Remove** takes the torrent out of the session and can ask whether to delete
 the data too. Removing a torrent from the session does **not** remove the file

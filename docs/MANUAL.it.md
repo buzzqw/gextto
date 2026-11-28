@@ -941,7 +941,8 @@ dicono quanto il motore ha scaricato e inviato da quando è partito.
   **Riprendi**, **Ricontrolla**, **Tag** (assegna, crea o togli un tag),
   **Rimuovi dalla sessione**.
 - **Strumenti**: **Pulisci completati** (toglie i torrent che hanno finito il
-  seed), **File orfani…**, **Aggiorna ogni 5 s** e il collegamento a
+  seed e i download HTTP completati o in errore; i file restano),
+  **File orfani…**, **Aggiorna ogni 5 s** e il collegamento a
   **Rimozione a fine seed**.
 
 **Rimuovi** toglie il torrent dalla sessione e può chiedere se cancellare anche

@@ -3970,7 +3970,7 @@ eng:
   "Ricarica l'elenco dei torrent e lo stato dei download": "Reload the torrent list and download status"
   "Ricerca online in corso…": "Online search in progress…"
   "Ricerca web in corso…": "Web search in progress…"
-  "Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed": "Removes completed torrents that reached their seed limits from the session"
+  "Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed e i download HTTP già finiti; i file restano": "Removes completed torrents that reached their seed limits, and finished HTTP downloads, from the session; files are kept"
   "Rimuove gli URL indicati dai web seed del torrent": "Removes the specified URLs from the torrent's web seeds"
   "Rimuove i torrent selezionati dalla sessione mantenendo i file": "Removes the selected torrents from the session while keeping the files"
   "Rimuove il limite temporaneo e ripristina i limiti normali": "Removes the temporary limit and restores the normal limits"

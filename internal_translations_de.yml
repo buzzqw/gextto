@@ -4624,7 +4624,7 @@ deu:
   "Ricarica l'elenco dei torrent e lo stato dei download": "Torrent-Liste und Download-Status neu laden"
   "Ricerca online in corso…": "Online-Suche läuft…"
   "Ricerca web in corso…": "Web-Suche läuft…"
-  "Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed": "Entfernt abgeschlossene Torrents, die ihre Seed-Grenzen erreicht haben, aus der Sitzung"
+  "Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed e i download HTTP già finiti; i file restano": "Entfernt abgeschlossene Torrents, die ihre Seed-Grenzen erreicht haben, und beendete HTTP-Downloads aus der Sitzung; die Dateien bleiben erhalten"
   "Rimuove gli URL indicati dai web seed del torrent": "Entfernt die angegebenen URLs aus den Web-Seeds des Torrents"
   "Rimuove i torrent selezionati dalla sessione mantenendo i file": "Entfernt die ausgewählten Torrents aus der Sitzung, behält aber die Dateien"
   "Rimuove il limite temporaneo e ripristina i limiti normali": "Entfernt das temporäre Limit und stellt die normalen Limits wieder her"

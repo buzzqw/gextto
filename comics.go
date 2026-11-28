@@ -902,14 +902,29 @@ func finalizeCancelled(id string, control *httpControl) {
 func ClearFinishedHTTPDownloads() int {
 	httpDownloadsMu.Lock()
 	finished := []string{}
+	titles := []string{}
 	for id, download := range httpDownloadsStore {
 		if download.Status == "completed" || download.Status == "error" {
 			finished = append(finished, id)
+			if title := strings.TrimSpace(download.Title); title != "" {
+				titles = append(titles, title)
+			}
 		}
 	}
 	httpDownloadsMu.Unlock()
 	for _, id := range finished {
 		removeHTTPDownload(id)
+	}
+	if len(finished) > 0 {
+		args := []any{}
+		if len(titles) > 0 {
+			args = append(args, "downloads", strings.Join(titles, " · "))
+		}
+		message := fmt.Sprintf("🗑️ Removed %d finished HTTP downloads from the download list; their files are kept", len(finished))
+		if len(finished) == 1 {
+			message = "🗑️ Removed 1 finished HTTP download from the download list; its files are kept"
+		}
+		logging.Info(message, args...)
 	}
 	return len(finished)
 }

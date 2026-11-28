@@ -4565,7 +4565,7 @@ pol:
   "Ricarica l'elenco dei torrent e lo stato dei download": "Odśwież listę torrentów i stan pobierania"
   "Ricerca online in corso…": "Wyszukiwanie online w toku…"
   "Ricerca web in corso…": "Wyszukiwanie w sieci w toku…"
-  "Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed": "Usuwa z sesji ukończone torrenty, które osiągnęły limity seed"
+  "Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed e i download HTTP già finiti; i file restano": "Usuwa z sesji ukończone torrenty, które osiągnęły limity seed, oraz zakończone pobrania HTTP; pliki pozostają"
   "Rimuove gli URL indicati dai web seed del torrent": "Usuwa podane URL z web seedów torrenta"
   "Rimuove i torrent selezionati dalla sessione mantenendo i file": "Usuwa zaznaczone torrenty z sesji, zachowując pliki"
   "Rimuove il limite temporaneo e ripristina i limiti normali": "Usuwa limit tymczasowy i przywraca normalne limity"

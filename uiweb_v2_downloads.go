@@ -16,6 +16,7 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var path string
 	var body []byte
 	torrentNames := map[string]string{}
+	httpFinishedTitles := []string{}
 	// The temporary limit being applied, for the confirmation message.
 	var tempDL, tempUL, tempMinutes int64
 	switch op {
@@ -24,6 +25,15 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ = json.Marshal(RemoveCompletedInput{DeleteFiles: false})
 		for _, torrent := range s.activeEngine().List() {
 			torrentNames[strings.ToLower(strings.TrimSpace(torrent.Hash))] = strings.TrimSpace(torrent.Name)
+		}
+		for _, download := range HTTPDownloads() {
+			if download.Status == "completed" || download.Status == "error" {
+				title := strings.TrimSpace(download.Title)
+				if title == "" {
+					title = download.ID
+				}
+				httpFinishedTitles = append(httpFinishedTitles, title)
+			}
 		}
 	case "temp_apply":
 		tempDL = v2ParseInt(r.FormValue("download_kib"), 0)
@@ -82,6 +92,10 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	raw, status := v2InternalJSON(s, http.MethodPost, path, nil, body)
+	clearedHTTP := 0
+	if op == "clear_completed" && status < 400 {
+		clearedHTTP = ClearFinishedHTTPDownloads()
+	}
 	message := "Impostazione salvata"
 	var clearReply struct {
 		Removed int      `json:"removed"`
@@ -92,26 +106,15 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		message = v2JSONError(raw)
 	} else if op == "clear_completed" {
 		if err := json.Unmarshal(raw, &clearReply); err == nil {
-			if clearReply.Removed > 0 {
-				names := make([]string, 0, len(clearReply.Items))
-				for _, hash := range clearReply.Items {
-					name := torrentNames[strings.ToLower(strings.TrimSpace(hash))]
-					if name == "" {
-						name = hash
-					}
-					names = append(names, name)
+			names := make([]string, 0, len(clearReply.Items))
+			for _, hash := range clearReply.Items {
+				name := torrentNames[strings.ToLower(strings.TrimSpace(hash))]
+				if name == "" {
+					name = hash
 				}
-				list := strings.Join(names, " · ")
-				if clearReply.Removed == 1 {
-					message = "1 torrent completato rimosso dalla sessione: " + list
-				} else {
-					message = fmt.Sprintf("%d torrent completati rimossi dalla sessione: %s", clearReply.Removed, list)
-				}
-			} else if clearReply.Skipped > 0 {
-				message = fmt.Sprintf("Nessun torrent rimosso (%d ancora in seed)", clearReply.Skipped)
-			} else {
-				message = "Nessun torrent completato da rimuovere"
+				names = append(names, name)
 			}
+			message = v2ClearCompletedMessage(clearReply.Removed, clearReply.Skipped, names, clearedHTTP, httpFinishedTitles)
 		}
 	} else if op == "temp_clear" && status < 400 {
 		message = "Eccezione tolta: torna la regola della configurazione"
@@ -151,6 +154,30 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, s)
+}
+
+func v2ClearCompletedMessage(torrentsRemoved, skipped int, torrentNames []string, httpRemoved int, httpNames []string) string {
+	parts := []string{}
+	if torrentsRemoved == 1 {
+		parts = append(parts, "1 torrent completato rimosso dalla sessione: "+strings.Join(torrentNames, " · "))
+	} else if torrentsRemoved > 1 {
+		parts = append(parts, fmt.Sprintf("%d torrent completati rimossi dalla sessione: %s", torrentsRemoved, strings.Join(torrentNames, " · ")))
+	}
+	if httpRemoved == 1 {
+		parts = append(parts, "1 download HTTP completato rimosso dalla sessione: "+strings.Join(httpNames, " · "))
+	} else if httpRemoved > 1 {
+		parts = append(parts, fmt.Sprintf("%d download HTTP completati rimossi dalla sessione: %s", httpRemoved, strings.Join(httpNames, " · ")))
+	}
+	if len(parts) > 0 {
+		if skipped > 0 {
+			parts = append(parts, fmt.Sprintf("%d torrent ancora in seed", skipped))
+		}
+		return strings.Join(parts, ". ")
+	}
+	if skipped > 0 {
+		return fmt.Sprintf("Nessun download rimosso (%d torrent ancora in seed)", skipped)
+	}
+	return "Nessun download completato da rimuovere"
 }
 
 // v2ExceptionMessage confirms the exception now in force.
