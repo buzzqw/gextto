@@ -671,16 +671,16 @@ parità di titolo vince il nome del film rispetto a un titolo alternativo. Le
 **corrispondenze in archivio** della scheda mostrano solo le release che
 Gextto riconoscerebbe davvero.
 
-Il titolo deve anche **finire** dove finiscono le sue parole: dopo l'ultima
-parola del titolo la release prosegue con un tag tecnico — l'anno, la
-risoluzione, la sorgente, il codec, la lingua, la versione — oppure con un altro
-titolo dello stesso film, come nelle release che scrivono il nome italiano e
-quello originale uno dopo l'altro. Una parola che appartiene al nome di un altro
-film chiude il confronto: un film intitolato «Film A» non prende più la release
-«Film A Altro Titolo 2026», che è un film diverso, e un seguito come «Film A 2»
-resta un altro film. Senza questo confine bastava che il titolo senza articolo
-fosse la prima parola del nome di un'altra release perché Gextto la scaricasse
-al posto del film scelto.
+Il titolo deve anche **finire** dove finisce il nome del film: dopo l'ultima
+parola del titolo la release prosegue con l'anno e con le etichette
+dell'indexer — risoluzione, sorgente, codec, lingua, versione — che non contano,
+oppure con un altro titolo dello stesso film, come nelle release che scrivono il
+nome italiano e quello originale uno dopo l'altro. Una parola che **continua**
+il nome, invece, appartiene a un altro film: un film intitolato «Film A» non
+prende più la release «Film A Altro Titolo 2026», che è un film diverso, e un
+seguito come «Film A 2» resta un altro film. Senza questo confine bastava che il
+titolo senza articolo fosse la prima parola del nome di un'altra release perché
+Gextto la scaricasse al posto del film scelto.
 
 ### La scheda del film
 

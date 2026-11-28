@@ -661,16 +661,16 @@ not count, and at the same length the film's own name wins over an alternative
 title. The page's **archive matches** show only the releases Gextto would really
 take.
 
-The title must also **end** where its words end: after the last word of the
-title the release goes on with a technical tag — the year, the resolution, the
-source, the codec, the language, the edition — or with another title of the same
-film, as in the releases that spell the local and the original name one after
-the other. A word that belongs to the name of another film closes the
-comparison: a film titled "Film A" no longer takes the release
-"Film A Another Title 2026", which is a different film, and a sequel such as
-"Film A 2" stays another film. Without that boundary it was enough for the
-article-less title to be the first word of another release's name for Gextto to
-download it in place of the chosen film.
+The title must also **end** where the film name ends: after the last word of
+the title the release goes on with the year and the indexer's labels —
+resolution, source, codec, language, edition — which do not count, or with
+another title of the same film, as in the releases that spell the local and the
+original name one after the other. A word that **continues** the name, on the
+other hand, belongs to another film: a film titled "Film A" no longer takes the
+release "Film A Another Title 2026", which is a different film, and a sequel
+such as "Film A 2" stays another film. Without that boundary it was enough for
+the article-less title to be the first word of another release's name for Gextto
+to download it in place of the chosen film.
 
 ### The movie page
 

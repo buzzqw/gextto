@@ -2016,14 +2016,46 @@ func movieArchiveTitles(movie *MovieConfig) []string {
 // keeps the highest value: the longer title wins, as the leftmost-and-longest
 // rule does in Sonarr.
 func movieTitleSpecificity(movie *MovieConfig, title string) int {
-	return movieTitleSpecificityForWords(movie, releaseTitleWords(title))
+	release := newReleaseTitleShape(title)
+	return movieTitleMatchFor(movie, &release).words
 }
 
-// movieTitleSpecificityForWords is movieTitleSpecificity with the release name
-// already reduced: a cycle compares the same release with every monitored film,
-// so the reduction is done once (see FindMovieMatch).
-func movieTitleSpecificityForWords(movie *MovieConfig, releaseWords []string) int {
-	return movieTitleMatchFor(movie, releaseWords).words
+// releaseTitleShape is one release name reduced for the movie match: the words
+// a title has to open, and the words of its clean name — the name the release
+// gives the film, before the tags. A cycle compares the same release with every
+// monitored film, so the reduction is done once (see FindMovieMatch); the clean
+// name is computed only when the cheap checks cannot decide.
+type releaseTitleShape struct {
+	title     string
+	words     []string
+	clean     []string
+	cleanDone bool
+}
+
+func newReleaseTitleShape(title string) releaseTitleShape {
+	return releaseTitleShape{title: title, words: releaseTitleWords(title)}
+}
+
+// cleanWords is the release name cut where the film name ends: at the year or
+// at the first technical token ("Coyote vs. Acme (2026) DCPRip 1080p" is the
+// film "Coyote vs. Acme", whatever labels follow).
+func (s *releaseTitleShape) cleanWords() []string {
+	if !s.cleanDone {
+		s.cleanDone = true
+		s.clean = cleanMovieTitleWords(s.title)
+	}
+	return s.clean
+}
+
+// cleanMovieTitleWords reduces the name an indexer gives the film: the words
+// before the year or the first technical token, with the same leading tags a
+// release name may carry.
+func cleanMovieTitleWords(title string) []string {
+	words := movieTitleWords(utils.ExtractCleanMovieName(title))
+	for len(words) > 1 && isLeadingReleaseTag(words[0]) {
+		words = words[1:]
+	}
+	return words
 }
 
 // movieTitleMatch is how well a release name fits a monitored film: the number
@@ -2041,9 +2073,9 @@ type movieTitleMatch struct {
 // movieTitleMatchFor finds the best title of the film the release name opens
 // with. Tiers, the order Radarr tries them in: 0 = the monitored name, 1 = the
 // original title, 2 = an alternative title, 3 = a translation.
-func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMatch {
+func movieTitleMatchFor(movie *MovieConfig, release *releaseTitleShape) movieTitleMatch {
 	best := movieTitleMatch{}
-	if len(releaseWords) == 0 {
+	if len(release.words) == 0 {
 		return best
 	}
 	// No slice is built per call: this runs for every release against every
@@ -2051,10 +2083,10 @@ func movieTitleMatchFor(movie *MovieConfig, releaseWords []string) movieTitleMat
 	// allocations.
 	consider := func(value string, tier int) {
 		words, usable := libraryTitleWords(value)
-		if !usable || !wordsOpenTitle(releaseWords, words) {
+		if !usable || !wordsOpenTitle(release.words, words) {
 			return
 		}
-		if !titleEndsOnReleaseTag(movie, releaseWords[len(words):]) {
+		if !titleEndsOnReleaseTag(movie, release, words) {
 			return
 		}
 		candidate := movieTitleMatch{words: len(words), tier: tier}
@@ -2163,8 +2195,9 @@ func wordsOpenTitle(release, title []string) bool {
 }
 
 // titleEndsOnReleaseTag reports whether the matched title really ends where
-// its words end: the release stops there, or the next word is a technical tag
-// or a second title of the same film.
+// its words end: the release stops there, the next word is a technical tag, it
+// is a second title of the same film, or the name the release gives the film is
+// the title itself (what follows is then a label, not part of a name).
 //
 // Without this boundary a film whose (article-less) title is the first word of
 // another film's name took that film's releases: "The Beast" reduced to
@@ -2172,14 +2205,15 @@ func wordsOpenTitle(release, title []string) bool {
 // downloaded in its place. A release ends a title on a separator — a year, a
 // resolution, a source, a codec, a language, an edition — never in the middle
 // of a name.
-func titleEndsOnReleaseTag(movie *MovieConfig, rest []string) bool {
-	if len(rest) == 0 {
+func titleEndsOnReleaseTag(movie *MovieConfig, release *releaseTitleShape, matched []string) bool {
+	rest := release.words[len(matched):]
+	if len(rest) == 0 || isReleaseTagWord(rest[0]) {
 		return true
 	}
-	if isReleaseTagWord(rest[0]) {
+	if movieTitleOpensAnotherTitle(movie, rest) {
 		return true
 	}
-	return movieTitleOpensAnotherTitle(movie, rest)
+	return tokensMatchWords(matched, release.cleanWords())
 }
 
 // movieTitleOpensAnotherTitle reports whether the words left after a matched
@@ -2227,11 +2261,12 @@ func isReleaseTagWord(word string) bool {
 		"hdready", "4k", "uhd":
 		return true
 	// Source, release kind and streaming service.
-	case "dl", "webdl", "webrip", "webmux", "dlmux", "bluray", "bdrip", "brrip",
-		"bdremux", "remux", "hdtv", "pdtv", "dvd", "dvdrip", "dvdscr", "hdrip",
-		"rip", "cam", "camrip", "hdcam", "ts", "tc", "telesync", "telecine",
-		"scr", "screener", "satrip", "iptv", "vod", "amzn", "dsnp", "atvp", "nf",
-		"hmax", "max", "pcok", "stan", "itunes", "vudu", "hq":
+	case "dl", "webdl", "webrip", "webmux", "dlmux", "bluray", "bd", "bdrip",
+		"brrip", "bdremux", "remux", "hdtv", "pdtv", "dvd", "dvdrip", "dvdscr",
+		"hdrip", "rip", "cam", "camrip", "hdcam", "ts", "hdts", "tc", "telesync",
+		"telecine", "scr", "screener", "tsscreener", "satrip", "dcp", "dcprip",
+		"iptv", "vod", "amzn", "dsnp", "atvp", "nf", "hmax", "max", "pcok",
+		"stan", "itunes", "vudu", "hq":
 		return true
 	// Video codec.
 	case "x264", "x265", "h264", "h265", "hevc", "avc", "av1", "vp9", "xvid",
@@ -2249,6 +2284,11 @@ func isReleaseTagWord(word string) bool {
 		"turkish", "hindi", "arabic", "hebrew", "czech", "hungarian", "romanian",
 		"greek", "thai", "indonesian", "malay", "multi", "multisub", "sub",
 		"subs", "subbed", "dubbed":
+		return true
+	// Language and subtitle markers of the releases that are not in English.
+	case "latino", "castellano", "dublado", "legendado", "nordic", "vostfr",
+		"truefrench", "vff", "vfq", "vost", "plsub", "engsub", "subita",
+		"subeng", "ita":
 		return true
 	// Edition and release revision.
 	case "extended", "theatrical", "unrated", "remastered", "restored",
@@ -2311,8 +2351,8 @@ func (c *Config) FindMovieMatch(title string, year *int64) *MovieConfig {
 	if !PassesMovieFilter(title) {
 		return nil
 	}
-	releaseWords := releaseTitleWords(title)
-	if len(releaseWords) == 0 {
+	release := newReleaseTitleShape(title)
+	if len(release.words) == 0 {
 		return nil
 	}
 	var matched *MovieConfig
@@ -2322,7 +2362,7 @@ func (c *Config) FindMovieMatch(title string, year *int64) *MovieConfig {
 		if !movie.Enabled || movieExcluded(movie, title) {
 			continue
 		}
-		match := movieTitleMatchFor(movie, releaseWords)
+		match := movieTitleMatchFor(movie, &release)
 		if match.words == 0 {
 			continue
 		}
@@ -2354,8 +2394,8 @@ func (c *Config) FindMovieMatchManual(title string, year *int64) *MovieConfig {
 	if !PassesMovieFilter(title) {
 		return nil
 	}
-	releaseWords := releaseTitleWords(title)
-	if len(releaseWords) == 0 {
+	release := newReleaseTitleShape(title)
+	if len(release.words) == 0 {
 		return nil
 	}
 	var matched *MovieConfig
@@ -2365,7 +2405,7 @@ func (c *Config) FindMovieMatchManual(title string, year *int64) *MovieConfig {
 		if !movie.Enabled || movieExcluded(movie, title) {
 			continue
 		}
-		match := movieTitleMatchFor(movie, releaseWords)
+		match := movieTitleMatchFor(movie, &release)
 		if match.words == 0 {
 			continue
 		}

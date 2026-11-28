@@ -668,6 +668,29 @@ func TestMovieMatchingRequiresTheTitleToEndOnAReleaseTag(t *testing.T) {
 	}
 }
 
+// The labels an indexer adds after the year are not part of the name: the
+// release is the film's even when the indexer writes its own words there. A
+// release whose *name* goes on after the title is another film.
+func TestMovieMatchingIgnoresLabelsAfterTheYear(t *testing.T) {
+	year2026 := int64(2026)
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{Name: "Coyote vs. Acme", Year: "2026", Enabled: true}}
+	for _, title := range []string{
+		"Coyote.vs.Acme.(2026).DCPRip.1080p.mkv",
+		"Coyote vs. Acme (2026) [PL.AI.720p.WEB-DL.XviD.AC3] [Lektor PL syntezator mowy]",
+		"Coyote vs. Acme (2026) TSScreener Latino.mp4",
+		"Coyote vs Acme (2026) DCPRip 1080p.mkv",
+	} {
+		if got := cfg.FindMovieMatch(title, &year2026); got == nil {
+			t.Errorf("release %q did not match its own film", title)
+		}
+	}
+	// A sequel is not the film: the name continues after the title.
+	if got := cfg.FindMovieMatch("Coyote.vs.Acme.The.Second.(2026).1080p.mkv", &year2026); got != nil {
+		t.Errorf("release of a sequel matched %q", got.Name)
+	}
+}
+
 // A release that spells two titles of the same film one after the other
 // ("local title - original title") keeps matching: the words after the title
 // are another title of the film, not a continuation of its name.
