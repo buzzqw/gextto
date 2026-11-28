@@ -698,10 +698,11 @@ della release:
   bloccata, come sopra.
 
 In entrambi i casi il film resta in coda e la ricerca continua con un'altra
-release; il file rifiutato va nel cestino, o viene cancellato secondo la scelta
-di *Configurazione → Pulizia*. Quando i dati non bastano — TMDB non indica la
-durata, `ffprobe` non c'è, il nome non è leggibile — non viene rifiutato niente:
-una copia dubbia non deve mai diventare un film mancante.
+release; il file rifiutato va nel cestino, o viene cancellato secondo l'opzione
+*Cosa fare con i file sostituiti* in *Configurazione → Archivio e spazio*.
+Quando i dati non bastano — TMDB non indica la durata, `ffprobe` non c'è, il
+nome non è leggibile — non viene rifiutato niente: una copia dubbia non deve mai
+diventare un film mancante.
 
 ### La scheda del film
 

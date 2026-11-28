@@ -688,10 +688,11 @@ release name:
   discarded and the release blocklisted, as above.
 
 In both cases the film stays in the queue and the search goes on with another
-release; the refused file goes to the trash, or is deleted according to
-*Settings → Cleanup*. When the data is not enough — TMDB does not give the
-duration, `ffprobe` is missing, the name is unreadable — nothing is refused: a
-doubtful copy must never become a missing film.
+release; the refused file goes to the trash, or is deleted according to the
+*What to do with replaced files* option in *Settings → Archive and space*.
+When the data is not enough — TMDB does not give the duration, `ffprobe` is
+missing, the name is unreadable — nothing is refused: a doubtful copy must
+never become a missing film.
 
 ### The movie page
 
