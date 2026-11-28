@@ -289,15 +289,15 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 		// file. The job stays in the queue file and is resumed at the next
 		// start, so it is not counted as a failure here.
 		logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup was interrupted before it could finish, the file is untouched",
-			filepath.Base(job.Path)), "path", job.Path)
+			filepath.Base(job.Path)))
 	case err != nil:
 		if errors.Is(err, errAudioCleanupWouldDiffer) {
 			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file%s, so it was left as it is",
-				filepath.Base(job.Path), audioCleanupRefusedNote(err)), "path", job.Path)
+				filepath.Base(job.Path), audioCleanupRefusedNote(err)))
 			return
 		}
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched: %v",
-			filepath.Base(job.Path), err), "path", job.Path)
+			filepath.Base(job.Path), err))
 	case report.Applied:
 		// The rename that follows needs the archive for itself, and a
 		// reservation is refused while the cleanup holds it.
@@ -305,7 +305,7 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 		cleanedPath := job.Path
 		if renamed, renameErr := renameAfterAudioCleanup(cfg, db, job.Path); renameErr != nil {
 			logging.Warn(fmt.Sprintf("🎧 «%s»: the file was cleaned but its name was not updated, it keeps the old language tag",
-				filepath.Base(job.Path)), "path", job.Path, "error", renameErr)
+				filepath.Base(job.Path)), "error", renameErr)
 		} else if renamed != "" {
 			cleanedPath = renamed
 		}
@@ -320,7 +320,7 @@ func audioCleanupProcess(job audioCleanupJob, cfg *Config, db *Database) {
 		}
 		logging.Info(fmt.Sprintf("🎧 «%s»: %s in another language removed, %s saved",
 			filepath.Base(cleanedPath), countLabel(len(report.Dropped), "audio track", "audio tracks"), logging.HumanBytesI64(report.SavedBytes)),
-			"path", cleanedPath, "tool", report.Backend)
+			"tool", report.Backend)
 	default:
 		logging.Debug("audio cleanup skipped", "path", job.Path, "reason", report.SkipReason)
 	}

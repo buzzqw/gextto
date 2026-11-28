@@ -2310,9 +2310,11 @@ righe del log sulla cartella osservata.
 - Se il log dice che la cartella dati è già in uso o la porta è occupata, c'è
   un'altra istanza: fermala e riavvia.
 - Dopo un riavvio Gextto può impiegare circa un minuto per essere pronto.
-- Se il log dice «Stopping: waiting for…», Gextto sta aspettando una copia o
-  uno spostamento su una rete lenta: dopo dieci minuti si ferma comunque e
-  ripulisce il file parziale al riavvio.
+- Se il log dice «Stopping: waiting for…» o «Stopping: still waiting for…»,
+  Gextto sta aspettando una copia o uno spostamento su una rete lenta: il nome
+  del file compare solo nel primo messaggio, poi il log dice da quanto tempo
+  sta aspettando. Dopo dieci minuti si ferma comunque e ripulisce il file
+  parziale al riavvio.
 
 ### Il backup FTP fallisce
 

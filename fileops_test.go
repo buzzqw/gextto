@@ -116,6 +116,45 @@ func TestStopBackgroundWorkersGivesUpOnAStuckFileCopy(t *testing.T) {
 	}
 }
 
+// A long shutdown wait must not print the same long release name every minute:
+// the first notice names the file, the later ones only report the elapsed time.
+func TestStopBackgroundWorkersNamesTheCopyOnlyOnce(t *testing.T) {
+	previousWorker, previousFile, previousNotice := workerStopTimeout, fileOpStopTimeout, shutdownNoticeInterval
+	workerStopTimeout, fileOpStopTimeout, shutdownNoticeInterval = time.Hour, 2*time.Second, 100*time.Millisecond
+	defer func() {
+		workerStopTimeout, fileOpStopTimeout, shutdownNoticeInterval = previousWorker, previousFile, previousNotice
+	}()
+	previous := mediaFileOps
+	mediaFileOps = &fileOperationRegistry{active: map[uint64]fileOperation{}, blockWhenClosed: false}
+	defer func() { mediaFileOps = previous }()
+	captured := captureLog(t)
+
+	state := &AppState{bgStop: make(chan struct{})}
+	// A worker stays busy until the copy ends, or shutdown would return
+	// before the wait even begins.
+	workerRelease := make(chan struct{})
+	state.bgWG.Add(1)
+	go func() {
+		defer state.bgWG.Done()
+		<-workerRelease
+	}()
+	finish := mediaFileOps.begin("Slow.Copy.mkv")
+	go func() {
+		time.Sleep(600 * time.Millisecond)
+		finish()
+		close(workerRelease)
+	}()
+	stopBackgroundWorkers(state)
+
+	out := captured.String()
+	if count := strings.Count(out, "Slow.Copy.mkv"); count != 1 {
+		t.Fatalf("the copy is named %d times, want once:\n%s", count, out)
+	}
+	if !strings.Contains(out, "still waiting for 1 file copy") {
+		t.Fatalf("the periodic notice should only report the elapsed time:\n%s", out)
+	}
+}
+
 func TestRetryStorageMovesHonoursBackoffAfterFailure(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "downloads")

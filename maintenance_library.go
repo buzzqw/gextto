@@ -454,7 +454,7 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 		// A stop or a restart killed the tool: the file was not judged, so no
 		// progress is recorded and the next pass looks at it again.
 		logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup was interrupted before it could finish, the file is untouched",
-			filepath.Base(candidate.Path)), "path", candidate.Path)
+			filepath.Base(candidate.Path)))
 		return "interrupted", candidate.Path, report
 	case err != nil:
 		if errors.Is(err, errAudioCleanupWouldDiffer) {
@@ -462,17 +462,17 @@ func runLibraryAudioCleanupFile(ctx context.Context, state *AppState, candidate 
 			// cleaned without changing it, so it is remembered as such and the
 			// next nights leave it alone (a new size or date probes it again).
 			logging.Info(fmt.Sprintf("🎧 «%s»: the audio cleanup would change the file%s, so it stays as it is and will not be tried again",
-				filepath.Base(candidate.Path), audioCleanupRefusedNote(err)), "path", candidate.Path)
+				filepath.Base(candidate.Path), audioCleanupRefusedNote(err)))
 			return "unsupported: " + err.Error(), candidate.Path, report
 		}
 		logging.Warn(fmt.Sprintf("🎧 «%s»: audio cleanup failed, the file was left untouched",
-			filepath.Base(candidate.Path)), "path", candidate.Path, "error", err)
+			filepath.Base(candidate.Path)), "error", err)
 		return "failed: " + err.Error(), candidate.Path, report
 	case report.Applied:
 		cleanedPath := candidate.Path
 		if renamed, renameErr := renameAfterAudioCleanup(latestConfig(state), state.db, candidate.Path); renameErr != nil {
 			logging.Warn(fmt.Sprintf("🎧 «%s»: the file was cleaned but its name was not updated, it keeps the old language tag",
-				filepath.Base(candidate.Path)), "path", candidate.Path, "error", renameErr)
+				filepath.Base(candidate.Path)), "error", renameErr)
 		} else if renamed != "" {
 			cleanedPath = renamed
 		}

@@ -157,8 +157,10 @@ var workerStopTimeout = 45 * time.Second
 var fileOpStopTimeout = 10 * time.Minute
 
 // shutdownNoticeInterval is how often a long shutdown wait says what it is
-// waiting for, so a stop that takes minutes is visibly progressing.
-var shutdownNoticeInterval = time.Minute
+// waiting for, so a stop that takes minutes is visibly progressing. The first
+// notice names the file; the later ones only say how long it has been running:
+// repeating the same long release name every minute says nothing new.
+var shutdownNoticeInterval = 2 * time.Minute
 
 // stopBackgroundWorkers signals every worker to stop and waits for them.
 // Copies and moves of media files get up to fileOpStopTimeout, other work up
@@ -199,6 +201,7 @@ func stopBackgroundWorkers(state *AppState) {
 
 	started := time.Now()
 	var lastNotice time.Time
+	var lastNames string
 	jobsStopped, workersStopped := false, false
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
@@ -221,15 +224,24 @@ func stopBackgroundWorkers(state *AppState) {
 			for i, operation := range operations {
 				names[i] = operation.what
 			}
-			if time.Since(lastNotice) >= shutdownNoticeInterval {
+			key := strings.Join(names, "\x00")
+			changed := key != lastNames
+			if lastNotice.IsZero() || changed || time.Since(lastNotice) >= shutdownNoticeInterval {
 				// The elapsed time is what tells a stop that is progressing
 				// from one that is stuck: a 10 GB copy over the network is
-				// expected to take a while, and without it the same sentence
-				// repeated every 15 seconds says nothing new.
-				logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d file %s to finish copying so nothing is left half-copied: %s (started %s ago)",
-					len(names), pluralWord(len(names), "copy", "copies"), quotedList(names, 3),
-					logDuration(time.Since(operations[0].started))))
+				// expected to take a while. Name the file only when the wait
+				// begins or the set of files changes; a periodic notice that
+				// repeats the same long release name says nothing new.
+				elapsed := logDuration(time.Since(operations[0].started))
+				if changed {
+					logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d file %s to finish copying so nothing is left half-copied: %s (started %s ago)",
+						len(names), pluralWord(len(names), "copy", "copies"), quotedList(names, 3), elapsed))
+				} else {
+					logging.Info(fmt.Sprintf("⏳ Stopping: still waiting for %d file %s to finish copying (started %s ago)",
+						len(names), pluralWord(len(names), "copy", "copies"), elapsed))
+				}
 				lastNotice = time.Now()
+				lastNames = key
 			}
 			if time.Since(operations[0].started) >= fileOpStopTimeout {
 				logging.Warn(fmt.Sprintf("⚠️ %s did not finish within %s: Gextto stops anyway and leaves the partial file to be cleaned up at the next start",

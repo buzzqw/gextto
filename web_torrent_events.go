@@ -2980,14 +2980,16 @@ type tevImportSource struct {
 // also names the replaced file(s), instead of the import line plus one
 // "replaced" line per removed file. note is appended when the caller has
 // something to add about the source (hardlink, eD2k incoming folder, resume).
-func logLibraryImport(cfg *Config, hash, target string, size int64, path, suffix, note string, replaced []string) {
+// The name of the release is not repeated here: the path already names the file
+// and the folder, so a third copy of the title only makes the line harder to read.
+func logLibraryImport(cfg *Config, hash string, size int64, path, suffix, note string, replaced []string) {
 	extra := ""
 	if note != "" {
 		extra = " · " + note
 	}
 	if len(replaced) == 0 {
-		logging.Info(fmt.Sprintf("📁 %s added to the library (%s): %s%s%s",
-			target, logging.HumanBytesI64(size), path, suffix, extra), "hash", hash)
+		logging.Info(fmt.Sprintf("📁 File added to the library (%s): %s%s%s",
+			logging.HumanBytesI64(size), path, suffix, extra), "hash", hash)
 		return
 	}
 	action := "moved to the trash"
@@ -2998,8 +3000,8 @@ func logLibraryImport(cfg *Config, hash, target string, size int64, path, suffix
 	for i, file := range replaced {
 		names[i] = "«" + filepath.Base(file) + "»"
 	}
-	logging.Info(fmt.Sprintf("♻️ %s updated (%s): %s · %s %s %s%s",
-		target, logging.HumanBytesI64(size), path,
+	logging.Info(fmt.Sprintf("♻️ File updated (%s): %s · %s %s %s%s",
+		logging.HumanBytesI64(size), path,
 		plural(len(replaced), "previous version", "previous versions"),
 		strings.Join(names, ", "), action, extra), "hash", hash)
 }
@@ -3114,7 +3116,7 @@ func tevCompleteTorrentOptions(cfg *Config, db *Database, torrents TorrentSessio
 	// seed period), so the two lifecycle messages retain their real order. When
 	// the release replaced existing files, one combined "updated" line is
 	// emitted instead of the import line plus one line per removed file.
-	logLibraryImport(cfg, event.Hash, logTarget(release), size, processedPath, suffix, source.note, replaced)
+	logLibraryImport(cfg, event.Hash, size, processedPath, suffix, source.note, replaced)
 	// If this release answers a "Riscarica" from the file integrity check, say
 	// which damaged copy it replaced.
 	logMediaIntegrityReplacementAfterRelease(db, event.Hash, release, processedPath)
@@ -3647,7 +3649,7 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 		if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
 			return false, err
 		}
-		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, filepath.Dir(source)), "hash", event.Hash)
 		return true, nil
 	}
 	// aMule has no seed policy in Gextto: in move mode its completed movie
@@ -3667,7 +3669,7 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 		if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
 			return false, err
 		}
-		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+		logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, filepath.Dir(source)), "hash", event.Hash)
 		return true, nil
 	}
 	// Movies are always relocated to the configured destination (or to the
@@ -3687,7 +3689,7 @@ func tevTorrentFinished(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		tevNotifySeeding(db, notifier, &event, &release, source, size)
 		logging.Info(fmt.Sprintf("🎉 %s downloaded. It stays in the download folder while it is shared, then moves to the library", logTarget(&release)),
-			"download folder", source, "hash", event.Hash)
+			"download folder", filepath.Dir(source), "hash", event.Hash)
 		return false, nil
 	}
 	// aMule cannot relocate a download: a file that reaches this point (no
@@ -3726,7 +3728,7 @@ func tevFinishedEpisode(cfg *Config, torrents TorrentSession, db *Database, even
 			if err := db.MarkReleaseCompleted(release, source, size); err != nil {
 				return true, false, err
 			}
-			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source), "hash", event.Hash)
+			logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, filepath.Dir(source)), "hash", event.Hash)
 			return true, true, nil
 		}
 		// For eD2k the seed policy is the configured one (seed rules and
@@ -3828,7 +3830,7 @@ func tevFinishedPack(cfg *Config, torrents TorrentSession, db *Database, event *
 			return false, err
 		}
 		logging.Info(fmt.Sprintf("🎉 «%s» downloaded (%s); no library folder is set for it, so it stays in %s",
-			event.Name, countLabel(len(entries), "episode", "episodes"), source), "hash", event.Hash)
+			event.Name, countLabel(len(entries), "episode", "episodes"), filepath.Dir(source)), "hash", event.Hash)
 		return true, nil
 	}
 	// Serialize against the periodic/manual rename repair for this

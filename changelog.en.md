@@ -23,6 +23,9 @@ create, the app on the phone — apply **only to the standalone version** and do
 not change Gextto's interface, where those pages do not exist. Engine fixes, on
 the other hand, apply to both.
 
+## 28 November 2026
+- **The log no longer repeats the episode name several times in one line.** When Gextto finished a download, moved a file into the library or cleaned audio tracks, the same name could appear two or three times in a line: in the message, in the folder and in the path. Each line now names the file once and shows only the folder you need; when Gextto is waiting for a copy on a slow network, the file is named in the first notice and the later ones only say how long it has been waiting. **What changes for you:** the log is easier to read and you no longer have to work out which of the repeated names is the right one.
+
 ## 27 November 2026
 - **A shutdown no longer hangs on a copy over a slow network.** If Gextto stops while moving a file on a slow NFS mount, the operation can stay stuck for hours: the service used to remain in stop-sigterm and could only be restarted by killing the process by hand. Gextto now waits at most ten minutes, names the unfinished file in the log and stops anyway; the partial file is cleaned up on the next start. The systemd unit has a fifteen-minute limit as a backstop. **What changes for you:** a restart no longer leaves the interface down for hours.
 - **A library copy is now visible on the torrent's row.** When Gextto is copying a torrent's files into the library, for example on a slow NAS, the torrent keeps sharing and the other checks wait for the copy to finish: nothing said so before. A "Copying" badge now appears beside the name, with a tooltip explaining why the torrent is still active and why the other checks are waiting. **What changes for you:** you no longer have to wonder whether the torrent is stuck or Gextto is still working.

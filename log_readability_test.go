@@ -9,8 +9,11 @@ package gextto
 // for hashes, peer counters and internal state.
 
 import (
+	"bytes"
+	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"path/filepath"
 	"regexp"
@@ -74,6 +77,9 @@ func TestLogCallsAreReadable(t *testing.T) {
 						name, line, message, found)
 				}
 			}
+			if repeated := logRepeatedFileField(call, fset); repeated != "" {
+				t.Errorf("%s:%d: %s", name, line, repeated)
+			}
 			return true
 		})
 	}
@@ -135,4 +141,67 @@ func logStringLiteral(expr ast.Expr) (string, bool) {
 	}
 	value, err := strconv.Unquote(literal.Value)
 	return value, err == nil
+}
+
+// logRepeatedFileField catches the shape "«filepath.Base(p)» …", "path", p:
+// the file is named in the sentence and again in a structured field, so the
+// reader sees the same long release name twice in one line. It also catches
+// the same path value passed to two fields of one call.
+func logRepeatedFileField(call *ast.CallExpr, fset *token.FileSet) string {
+	if len(call.Args) < 3 {
+		return ""
+	}
+	format, ok := call.Args[0].(*ast.CallExpr)
+	if !ok || len(format.Args) < 2 {
+		return ""
+	}
+	selector, ok := format.Fun.(*ast.SelectorExpr)
+	if !ok || selector.Sel.Name != "Sprintf" {
+		return ""
+	}
+	pkg, ok := selector.X.(*ast.Ident)
+	if !ok || pkg.Name != "fmt" {
+		return ""
+	}
+	// The path behind every filepath.Base(...) used in the message.
+	bases := make(map[string]bool)
+	for _, arg := range format.Args[1:] {
+		base, ok := arg.(*ast.CallExpr)
+		if !ok || len(base.Args) != 1 {
+			continue
+		}
+		fun, ok := base.Fun.(*ast.SelectorExpr)
+		if !ok || fun.Sel.Name != "Base" {
+			continue
+		}
+		qualifier, ok := fun.X.(*ast.Ident)
+		if !ok || qualifier.Name != "filepath" {
+			continue
+		}
+		bases[exprString(fset, base.Args[0])] = true
+	}
+	if len(bases) == 0 {
+		return ""
+	}
+	fields := make(map[string]string)
+	for i := 1; i+1 < len(call.Args); i += 2 {
+		value := exprString(fset, call.Args[i+1])
+		key := exprString(fset, call.Args[i])
+		if bases[value] {
+			return fmt.Sprintf("the file %s is named in the message and again in the field %s", value, key)
+		}
+		if previous, ok := fields[value]; ok {
+			return fmt.Sprintf("the value %s is passed to both %s and %s", value, previous, key)
+		}
+		fields[value] = key
+	}
+	return ""
+}
+
+func exprString(fset *token.FileSet, expr ast.Expr) string {
+	var out bytes.Buffer
+	if err := printer.Fprint(&out, fset, expr); err != nil {
+		return ""
+	}
+	return out.String()
 }

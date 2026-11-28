@@ -528,6 +528,22 @@ func TestAmuleActionTextIsASentence(t *testing.T) {
 	}
 }
 
+// The import line must not name the release again: the path already contains
+// the series folder and the renamed file, and a third copy of the same title
+// made the line hard to read.
+func TestLibraryImportNamesTheFileOnce(t *testing.T) {
+	captured := captureLog(t)
+	path := filepath.Join(t.TempDir(), "Series A", "Series A - S01E02 - [WEB-DL][1080p].mkv")
+	logLibraryImport(nil, "hash", 1_500_000_000, path, "", "", nil)
+	out := captured.String()
+	if count := strings.Count(out, "S01E02"); count != 1 {
+		t.Fatalf("the episode is named %d times in the import line, want once:\n%s", count, out)
+	}
+	if !strings.Contains(out, "File added to the library") {
+		t.Fatalf("the import line is missing:\n%s", out)
+	}
+}
+
 func TestCutAtRuneKeepsWholeCharacters(t *testing.T) {
 	name := strings.Repeat("a", 38) + "èè"
 	got := shortTorrentName(name + " altro")
