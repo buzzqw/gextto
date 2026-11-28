@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -409,6 +410,102 @@ func (f *fakeSubtitleTorrentEngine) List() []models.TorrentView { return []model
 func (f *fakeSubtitleTorrentEngine) Files(hash string) ([]models.FileView, bool, error) {
 	f.called = hash
 	return f.files, f.ok, f.err
+}
+
+// fakeSubtitleApplyEngine is a whole TorrentEngine for the handlers: the
+// embedded interface satisfies the rest and is never called.
+type fakeSubtitleApplyEngine struct {
+	mockTorrentEngine
+	files []models.FileView
+}
+
+func (f *fakeSubtitleApplyEngine) Files(hash string) ([]models.FileView, bool, error) {
+	return f.files, true, nil
+}
+
+// TestSubtitleApplyForAnActiveTorrentWritesTheSidecar: the Subtitles tab of an
+// active torrent can download the chosen subtitle too, not just browse it; the
+// file is written next to the video and follows it into the library.
+func TestSubtitleApplyForAnActiveTorrentWritesTheSidecar(t *testing.T) {
+	state := newTestAppState(t)
+	// v2InternalJSON goes through the in-process router, which Router registers.
+	appServer := httptest.NewServer(Router(state))
+	defer appServer.Close()
+	root := t.TempDir()
+	video := filepath.Join(root, "Show.S01E01.1080p.mkv")
+	if err := os.WriteFile(video, make([]byte, 256<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("d", 40)
+	state.setActiveEngine(&fakeSubtitleApplyEngine{
+		mockTorrentEngine: mockTorrentEngine{torrents: []models.TorrentView{{
+			Hash: hash, Name: "Show.S01E01.1080p.WEB-DL.x264-GROUP", SavePath: root, Progress: 1,
+		}}},
+		files: []models.FileView{{Path: "Show.S01E01.1080p.mkv", Size: 256 << 10, Downloaded: 256 << 10, Priority: 1}},
+	})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/download":
+			_, _ = io.WriteString(w, `{"link":"http://`+r.Host+`/sub.srt","file_name":"sub.srt","remaining":4}`)
+		case "/sub.srt":
+			_, _ = io.WriteString(w, "1\n00:00:00,000 --> 00:00:01,000\nCiao\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	cfg := latestConfig(state)
+	cfg.DryRun = false
+	cfg.Settings[subtitleSettingEnabled] = "true"
+	cfg.Settings[subtitleSettingProviderURL] = server.URL
+	cfg.Settings[subtitleSettingAPIKey] = "key"
+
+	form := url.Values{
+		"torrent_hash": {hash}, "file_index": {"0"}, "file_id": {"20"}, "language": {"en"},
+	}
+	request := httptest.NewRequest(http.MethodPost, "/subtitles/apply", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	recorder := httptest.NewRecorder()
+	V2SubtitleApply(recorder, request, state)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("apply -> %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "Scaricato") {
+		t.Fatalf("apply answer does not confirm the download: %s", recorder.Body.String())
+	}
+	data, err := os.ReadFile(filepath.Join(root, "Show.S01E01.1080p.eng.srt"))
+	if err != nil {
+		t.Fatalf("the sidecar was not written next to the video: %v", err)
+	}
+	if !strings.Contains(string(data), "Ciao") {
+		t.Fatalf("sidecar content = %q", data)
+	}
+}
+
+// TestTorrentSubtitlesTabOffersTheApplyButton locks the controls the candidate
+// rows carry: without them the tab could only browse.
+func TestTorrentSubtitlesTabOffersTheApplyButton(t *testing.T) {
+	hash := strings.Repeat("a", 40)
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_torrent_subtitles_results", v2TorrentSubtitlesView{
+		Hash: hash, FileIndex: 2,
+		Candidates: []subtitleCandidate{{FileID: 20, Language: "en", Release: "Show.S01E01"}},
+	}); err != nil {
+		t.Fatalf("render v2_torrent_subtitles_results: %v", err)
+	}
+	out := buffer.String()
+	for _, want := range []string{
+		`hx-post="/subtitles/apply"`,
+		`name="torrent_hash" value="` + hash + `"`,
+		`name="file_index" value="2"`,
+		`name="file_id" value="20"`,
+		`name="replace" value="true"`,
+		`Applica</button>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("candidate row missing %q in:\n%s", want, out)
+		}
+	}
 }
 
 func TestResolveSubtitleTorrentTargetUsesSelectedFileAndAllowsIncomplete(t *testing.T) {

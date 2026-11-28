@@ -119,9 +119,9 @@ change. `/ui` is not served. For operational checks use
 | POST | `/api/subtitles/settings` | save subtitle provider settings; provider_kind selects OpenSubtitles.com REST or OpenSubtitles.org legacy (no API key required); blank secrets keep the stored value |
 | POST | `/api/subtitles/test` | test the selected provider without downloading a subtitle |
 | GET | `/api/subtitles/search` | read-only subtitle preview for an archived episode (series, season, episode) or movie (movie_id), or an active torrent (torrent_hash, zero-based file_index); languages accepts comma-separated provider codes or all. Active targets may be incomplete and then omit hash/size matching. Candidates carry match/reputation score, release_similarity, recommended, trusted/AI flags and download count |
-| POST | `/api/subtitles/apply` | download and atomically write one confirmed subtitle for an archived target; dry-run and collisions are refused |
+| POST | `/api/subtitles/apply` | download and atomically write one confirmed subtitle for an archived target or for an active torrent (torrent_hash with a zero-based file_index, also while the file is incomplete); dry-run and collisions are refused |
 | POST | `/subtitles/search` | SSR/HTMX subtitle preview modal, or active-torrent result fragment when torrent_hash, file_index and languages are supplied |
-| POST | `/subtitles/apply` | SSR/HTMX confirmed subtitle apply |
+| POST | `/subtitles/apply` | SSR/HTMX confirmed subtitle apply; with torrent_hash and file_index it answers with the active-torrent result fragment instead of the modal |
 | POST | `/subtitles/test` | SSR/HTMX provider check using the values currently in the settings form, without saving |
 | POST | `/subtitles/test` | SSR/HTMX provider connection check using the values in the settings form, without saving them |
 | POST | `/series/gaps/search` | Series → Missing tab: start the background search of every missing episode of one series (form field series) |

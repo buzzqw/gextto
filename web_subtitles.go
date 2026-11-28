@@ -231,15 +231,17 @@ func SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 type subtitleApplyRequest struct {
-	Series   string `json:"series"`
-	Season   int64  `json:"season"`
-	Episode  int64  `json:"episode"`
-	MovieID  int64  `json:"movie_id"`
-	FileID   int64  `json:"file_id"`
-	Language string `json:"language"`
-	Forced   bool   `json:"forced"`
-	SDH      bool   `json:"sdh"`
-	Replace  bool   `json:"replace"`
+	Series      string `json:"series"`
+	Season      int64  `json:"season"`
+	Episode     int64  `json:"episode"`
+	MovieID     int64  `json:"movie_id"`
+	TorrentHash string `json:"torrent_hash"`
+	FileIndex   *int64 `json:"file_index"`
+	FileID      int64  `json:"file_id"`
+	Language    string `json:"language"`
+	Forced      bool   `json:"forced"`
+	SDH         bool   `json:"sdh"`
+	Replace     bool   `json:"replace"`
 }
 
 func SubtitleApply(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -257,7 +259,23 @@ func SubtitleApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	target, err := resolveSubtitleTarget(r.Context(), cfg, s.db, input.Series, input.Season, input.Episode, input.MovieID)
+	var target subtitleTarget
+	var err error
+	if torrentHash := strings.TrimSpace(input.TorrentHash); torrentHash != "" {
+		// A subtitle can be applied while the video is still downloading: the
+		// sidecar is written next to the file and follows it into the library.
+		if input.Series != "" || input.Season != 0 || input.Episode != 0 || input.MovieID != 0 {
+			jsonError(w, http.StatusBadRequest, "choose either an archived title or an active torrent")
+			return
+		}
+		if input.FileIndex == nil || *input.FileIndex < 0 {
+			jsonError(w, http.StatusBadRequest, "file_index is required for an active torrent")
+			return
+		}
+		target, err = resolveSubtitleTorrentTarget(r.Context(), cfg, s.db, s.activeEngine(), torrentHash, int(*input.FileIndex))
+	} else {
+		target, err = resolveSubtitleTarget(r.Context(), cfg, s.db, input.Series, input.Season, input.Episode, input.MovieID)
+	}
 	if err != nil {
 		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return

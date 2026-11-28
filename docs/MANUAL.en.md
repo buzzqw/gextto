@@ -943,7 +943,7 @@ and the sheet scrolls inside itself. The tabs:
 | **General** | torrent data (the magnet shows its first three lines), copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
 | **Tracker** | add trackers (`tier\|url` per line) or remove one; each one shows its state, failures, seeds and peers, **how long the last announce took** to be answered and the **median** of the recent ones, so a slow tracker is told from a slow line; **waiting** marks the announce that is awaiting its reply. At the top, how many announces are in flight and the median across the trackers |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
-| **Subtitles** | when the provider is active, choose the video file, filter by language and find the available subtitles; it shows matching, reputation and score, even while the file is downloading |
+| **Subtitles** | when the provider is active, choose the video file, filter by language and find the available subtitles; it shows matching, reputation and score, even while the file is downloading, and **Apply** downloads them next to the video |
 | **Peers** | the connected peers; with gx-torrent the peer's **country** sits next to its address, from the DB-IP database gx-torrent downloads by itself |
 | **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
 | **Speed** | that torrent's download and upload chart over the last 30 minutes, with average and peak. Gextto records the speed of the torrents that are transferring only, so the chart is already there when you open the tab |
@@ -1781,7 +1781,11 @@ a file is incomplete, the search uses identity and name similarity without
 presenting the final hash or size as known. A file holding several episodes is
 refused until you choose one unambiguous episode. Every manual search leaves the
 title, requested language and number of results in the log; a failed search
-records the reason.
+records the reason. Every result has **Apply**: it downloads the chosen subtitle
+and writes it next to the torrent's video, even while the download is still in
+progress; the file then follows the video into the library. If the subtitle
+already exists you must tick **Replace if it exists**, as in the preview of an
+archived title.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads

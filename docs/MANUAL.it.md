@@ -966,7 +966,7 @@ foglio scorre al suo interno. Le schede:
 | **Generale** | dati del torrent (del magnet si vedono le prime tre righe), copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
 | **Tracker** | aggiungi tracker (`tier\|url` per riga) o rimuovine uno; per ognuno vedi lo stato, gli errori, i seed e i peer, **quanto ci ha messo l'ultimo annuncio** a ricevere la risposta e la **mediana** degli ultimi annunci, così un tracker lento si distingue da una linea lenta; **in attesa** segnala l'annuncio che aspetta la risposta. In cima, quanti annunci sono in corso e la mediana fra i tracker |
 | **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
-| **Sottotitoli** | quando il provider è attivo, scegli il file video, filtra per lingua e cerca i sottotitoli disponibili; mostra corrispondenza, reputazione e punteggio, anche mentre il file è in download |
+| **Sottotitoli** | quando il provider è attivo, scegli il file video, filtra per lingua e cerca i sottotitoli disponibili; mostra corrispondenza, reputazione e punteggio, anche mentre il file è in download, e con **Applica** li scarica accanto al video |
 | **Peers** | i peer connessi; con gx-torrent accanto all'indirizzo c'è il **paese** del peer, dal database DB-IP che gx-torrent scarica da solo |
 | **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante. Con gx-torrent sotto c'è la **disponibilità tra i peer**: più la barra è piena, più peer connessi hanno i pezzi che ti mancano; il rosso indica pezzi che nessun peer connesso ha. Con qBittorrent c'è la sola mappa, e i pezzi dei file saltati risultano mancanti |
 | **Velocità** | il grafico di download e upload di quel torrent negli ultimi 30 minuti, con media e picco. Gextto registra la velocità solo dei torrent che stanno trasferendo, quindi il grafico c'è già quando apri la scheda |
@@ -1808,7 +1808,10 @@ identità e somiglianza dei nomi, senza presentare come definitivi hash o
 dimensione finali. Un file che contiene più episodi viene rifiutato finché non
 scegli una puntata univoca. Ogni ricerca manuale lascia nel log il titolo, la
 lingua richiesta e quanti risultati ha trovato; una ricerca fallita riporta il
-motivo.
+motivo. Ogni risultato ha **Applica**: scarica il sottotitolo scelto e lo scrive
+accanto al video del torrent, anche mentre il download è ancora in corso; il file
+segue poi il video in libreria. Se il sottotitolo esiste già devi spuntare
+**Sostituisci se esiste**, come nell'anteprima di un titolo archiviato.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
 un'anteprima con lingua, release, motivo della corrispondenza e nome del file

@@ -45,6 +45,14 @@ type v2TorrentSubtitlesView struct {
 	Error           bool
 }
 
+// v2SubtitleAppliedView is the small answer the Subtitles tab of an active
+// torrent shows in place of the candidate: the file was written, or why not.
+type v2SubtitleAppliedView struct {
+	AppliedPath string
+	Message     string
+	Error       bool
+}
+
 var v2SubtitleLanguageLabels = map[string]string{
 	"ar": "العربية", "da": "Dansk", "de": "Deutsch", "en": "English", "es": "Español",
 	"fi": "Suomi", "fr": "Français", "he": "עברית", "hi": "हिन्दी", "it": "Italiano",
@@ -225,18 +233,34 @@ func V2SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func V2SubtitleApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := v2SubtitlesView{}
+	torrentHash := strings.TrimSpace(r.FormValue("torrent_hash"))
+	var fileIndex *int64
+	if torrentHash != "" {
+		parsed, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("file_index")), 10, 64)
+		if err != nil || parsed < 0 {
+			v2Render(w, http.StatusOK, "v2_torrent_subtitle_applied", v2SubtitleAppliedView{Error: true, Message: "Seleziona un file video valido."}, s)
+			return
+		}
+		fileIndex = &parsed
+	}
 	season, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("season")), 10, 64)
 	episode, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("episode")), 10, 64)
 	movieID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("movie_id")), 10, 64)
 	fileID, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("file_id")), 10, 64)
 	body, _ := json.Marshal(subtitleApplyRequest{
 		Series: r.FormValue("series"), Season: season, Episode: episode, MovieID: movieID,
+		TorrentHash: torrentHash, FileIndex: fileIndex,
 		FileID: fileID, Language: r.FormValue("language"), Forced: r.FormValue("forced") == "true",
 		SDH: r.FormValue("sdh") == "true", Replace: r.FormValue("replace") == "true",
 	})
 	raw, status := v2InternalJSON(s, http.MethodPost, "/api/subtitles/apply", nil, body)
 	if status >= 400 {
-		view.Error, view.Message = true, v2JSONError(raw)
+		message := v2JSONError(raw)
+		if torrentHash != "" {
+			v2Render(w, http.StatusOK, "v2_torrent_subtitle_applied", v2SubtitleAppliedView{Error: true, Message: message}, s)
+			return
+		}
+		view.Error, view.Message = true, message
 		v2Render(w, http.StatusOK, "v2_subtitles_modal", view, s)
 		return
 	}
@@ -244,6 +268,10 @@ func V2SubtitleApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Path string `json:"path"`
 	}
 	_ = json.Unmarshal(raw, &payload)
+	if torrentHash != "" {
+		v2Render(w, http.StatusOK, "v2_torrent_subtitle_applied", v2SubtitleAppliedView{AppliedPath: payload.Path}, s)
+		return
+	}
 	view.AppliedPath = payload.Path
 	view.Message = "Sottotitolo installato."
 	v2Render(w, http.StatusOK, "v2_subtitles_modal", view, s)
