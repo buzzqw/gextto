@@ -282,13 +282,16 @@ func SubtitleApply(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	path, err := applySubtitle(r.Context(), cfg, s.db, target, input.FileID, input.Language, input.Forced, input.SDH, input.Replace)
 	if errors.Is(err, errSubtitleCollision) {
+		logging.Warn("Could not add the subtitle: a file with that name already exists", "title", target.Label)
 		jsonError(w, http.StatusConflict, "subtitle already exists; enable replace to overwrite it")
 		return
 	}
 	if err != nil {
+		logging.Warn("Could not add the subtitle to a video", "title", target.Label, "error", err.Error())
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	logging.Info("Added a subtitle next to a video", "title", target.Label, "language", input.Language)
 	jsonResponse(w, map[string]any{"ok": true, "path": path})
 }
 

@@ -550,6 +550,55 @@ func TestResolveSubtitleTorrentTargetUsesSelectedFileAndAllowsIncomplete(t *test
 	}
 }
 
+// TestResolveSubtitleTorrentTargetFallsBackToTheArchivedVideo: a torrent that
+// has left the session after archiving still answers the page that was open.
+// The archived file is a single episode or film; the record cannot say which
+// file of a pack was archived, so those are refused with a clear message.
+func TestResolveSubtitleTorrentTargetFallsBackToTheArchivedVideo(t *testing.T) {
+	state := newTestAppState(t)
+	video := filepath.Join(t.TempDir(), "Show.S01E01.1080p.mkv")
+	if err := os.WriteFile(video, make([]byte, 256<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("e", 40)
+	series, season, episode := "Show", int64(1), int64(1)
+	release := models.Release{Title: "Show.S01E01.1080p.WEB-DL.x264-GROUP", Magnet: "magnet:?xt=urn:btih:" + hash, InfoHash: hash, Source: manualSource, Kind: "series", Series: &series, Season: &season, Episode: &episode}
+	if err := state.db.RegisterTorrentScored(&release, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.SetTorrentProcessedPath(hash, video); err != nil {
+		t.Fatal(err)
+	}
+	engine := &fakeSubtitleTorrentEngine{} // the torrent is not in the session any more
+	target, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0)
+	if err != nil {
+		t.Fatalf("archived fallback: %v", err)
+	}
+	if target.VideoPath != video || target.Series != "Show" || target.Season != 1 || target.Episode != 1 || !target.FileComplete || target.OSHash == "" {
+		t.Fatalf("archived target = %+v", target)
+	}
+	if target.TorrentHash != hash || target.FileIndex == nil || *target.FileIndex != 0 {
+		t.Fatalf("archived identity = %+v", target)
+	}
+	if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 1); err == nil {
+		t.Fatal("a file index other than the archived one was accepted")
+	}
+
+	packHash := strings.Repeat("f", 40)
+	pack := release
+	pack.Magnet, pack.InfoHash, pack.Episode, pack.EpisodeRange = "magnet:?xt=urn:btih:"+packHash, packHash, nil, []int64{0, 1}
+	pack.IsPack = true
+	if err := state.db.RegisterTorrentScored(&pack, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.SetTorrentProcessedPath(packHash, video); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, packHash, 0); err == nil {
+		t.Fatal("an archived pack was accepted without saying which episode")
+	}
+}
+
 func TestResolveSubtitleTorrentTargetParsesRawManualName(t *testing.T) {
 	state := newTestAppState(t)
 	root := t.TempDir()

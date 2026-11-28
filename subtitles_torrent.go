@@ -25,8 +25,8 @@ type subtitleTorrentSource interface {
 // can still find useful candidates, but no partial OSHash or size is sent to the
 // provider as if it described the finished video.
 func resolveSubtitleTorrentTarget(ctx context.Context, cfg *Config, db *Database, torrents subtitleTorrentSource, rawHash string, fileIndex int) (subtitleTarget, error) {
-	if cfg == nil || db == nil || torrents == nil {
-		return subtitleTarget{}, errors.New("configuration, database or torrent engine unavailable")
+	if cfg == nil || db == nil {
+		return subtitleTarget{}, errors.New("configuration or database unavailable")
 	}
 	hash := canonicalInfoHash(strings.TrimSpace(rawHash))
 	if hash == "" {
@@ -37,18 +37,23 @@ func resolveSubtitleTorrentTarget(ctx context.Context, cfg *Config, db *Database
 	}
 	var view models.TorrentView
 	found := false
-	for _, candidate := range torrents.List() {
-		if canonicalInfoHash(candidate.Hash) != hash {
-			continue
+	if torrents != nil {
+		for _, candidate := range torrents.List() {
+			if canonicalInfoHash(candidate.Hash) != hash {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(candidate.Network), "ed2k") {
+				return subtitleTarget{}, errors.New("subtitles are not available for eD2K downloads")
+			}
+			view, found = candidate, true
+			break
 		}
-		if strings.EqualFold(strings.TrimSpace(candidate.Network), "ed2k") {
-			return subtitleTarget{}, errors.New("subtitles are not available for eD2K downloads")
-		}
-		view, found = candidate, true
-		break
 	}
 	if !found {
-		return subtitleTarget{}, errors.New("torrent not found in the active session")
+		// The download may have finished and left the session while its page
+		// was still open: the archived copy is the video the operator means,
+		// so a subtitle chosen there is written next to it instead of failing.
+		return resolveArchivedSubtitleTorrentTarget(ctx, cfg, db, hash, fileIndex)
 	}
 	meta, err := db.TorrentMeta(hash)
 	if err != nil {
@@ -108,6 +113,62 @@ func resolveSubtitleTorrentTarget(ctx context.Context, cfg *Config, db *Database
 		if probe, err := probeFileWithinContext(ctx, videoPath, 15*time.Second); err == nil {
 			identity.RuntimeSeconds = probe.RuntimeSeconds
 		}
+	}
+	return identity, nil
+}
+
+// resolveArchivedSubtitleTorrentTarget resolves the video of a torrent that has
+// left the session. The archive record is the only copy left, and it names one
+// file: a single episode or film, not a pack, because the record does not say
+// which file of a pack was archived.
+func resolveArchivedSubtitleTorrentTarget(ctx context.Context, cfg *Config, db *Database, hash string, fileIndex int) (subtitleTarget, error) {
+	meta, err := db.TorrentMeta(hash)
+	if err != nil {
+		return subtitleTarget{}, err
+	}
+	recorded, err := db.TorrentProcessed(hash)
+	if err != nil {
+		return subtitleTarget{}, err
+	}
+	if recorded == nil || strings.TrimSpace(*recorded) == "" {
+		return subtitleTarget{}, errors.New("torrent not found in the active session")
+	}
+	if fileIndex != 0 {
+		return subtitleTarget{}, errors.New("the download has finished: open the archived title to choose which episode gets the subtitle")
+	}
+	if meta != nil && meta.Release.IsPack {
+		return subtitleTarget{}, errors.New("the download has finished: open the archived episode to apply its subtitle")
+	}
+	if meta == nil {
+		return subtitleTarget{}, errors.New("torrent not found in the active session")
+	}
+	path := strings.TrimSpace(*recorded)
+	info, err := os.Lstat(path)
+	if err != nil {
+		return subtitleTarget{}, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() || !subtitleVideoExtension(path) {
+		return subtitleTarget{}, errors.New("the download has finished and its archived file is not a video: open the archived title to apply its subtitle")
+	}
+	identity := subtitleTarget{Label: filepath.Base(path), VideoPath: path, FileComplete: true}
+	if tevNeedsManualIdentity(meta) {
+		if err := subtitleTargetFromNames(cfg, &identity, meta.Release.Title, filepath.Base(path)); err != nil {
+			return subtitleTarget{}, err
+		}
+	} else {
+		identity.ReferenceName = strings.TrimSpace(meta.Release.Title)
+		if err := subtitleTargetFromRelease(cfg, &identity, &meta.Release, filepath.Base(path)); err != nil {
+			return subtitleTarget{}, err
+		}
+	}
+	index := fileIndex
+	identity.TorrentHash, identity.FileIndex = hash, &index
+	identity.SizeBytes = info.Size()
+	if value, size, err := subtitleprovider.HashFile(path); err == nil {
+		identity.OSHash, identity.SizeBytes = value, size
+	}
+	if probe, err := probeFileWithinContext(ctx, path, 15*time.Second); err == nil {
+		identity.RuntimeSeconds = probe.RuntimeSeconds
 	}
 	return identity, nil
 }

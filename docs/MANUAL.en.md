@@ -1783,9 +1783,11 @@ refused until you choose one unambiguous episode. Every manual search leaves the
 title, requested language and number of results in the log; a failed search
 records the reason. Every result has **Apply**: it downloads the chosen subtitle
 and writes it next to the torrent's video, even while the download is still in
-progress; the file then follows the video into the library. If the subtitle
-already exists you must tick **Replace if it exists**, as in the preview of an
-archived title.
+progress; the file then follows the video into the library. If the download has
+already finished and the file has moved, the subtitle is written next to the
+archived copy, so the tab keeps working afterwards. If the subtitle already
+exists you must tick **Replace if it exists**, as in the preview of an archived
+title.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads

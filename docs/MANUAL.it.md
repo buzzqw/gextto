@@ -1810,7 +1810,9 @@ scegli una puntata univoca. Ogni ricerca manuale lascia nel log il titolo, la
 lingua richiesta e quanti risultati ha trovato; una ricerca fallita riporta il
 motivo. Ogni risultato ha **Applica**: scarica il sottotitolo scelto e lo scrive
 accanto al video del torrent, anche mentre il download è ancora in corso; il file
-segue poi il video in libreria. Se il sottotitolo esiste già devi spuntare
+segue poi il video in libreria. Se il download è già finito e il file è stato
+spostato, il sottotitolo viene scritto accanto alla copia archiviata: la scheda
+resta utilizzabile anche dopo. Se il sottotitolo esiste già devi spuntare
 **Sostituisci se esiste**, come nell'anteprima di un titolo archiviato.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
