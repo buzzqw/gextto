@@ -247,7 +247,7 @@
 {{define "v2_live_side"}}
 <div id="v2-live-side" class="live-side" aria-label="{{tr "Traffico in questo momento"}}">
   <div class="live-side-rates">
-    <span class="live-side-down" {{ed2kTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> <strong>{{tr .Download}}</strong></span>
+    <span class="live-side-down" {{ed2kTitle "Velocità di download totale: torrent, aMule e download HTTP"}}><span aria-hidden="true">↓</span> <strong>{{tr .Download}}</strong></span>
     <span class="live-side-up" {{ed2kTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> <strong>{{tr .Upload}}</strong></span>
   </div>
   {{if .SideBars}}<div class="live-side-bars" role="img" aria-label="{{tr "Velocità di download negli ultimi 30 minuti"}}" {{trTitle "Velocità di download negli ultimi 30 minuti: ogni barra è un minuto e mezzo"}}>{{range .SideBars}}<i style="--h:{{.}}%"></i>{{end}}</div>{{end}}

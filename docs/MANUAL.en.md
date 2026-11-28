@@ -1957,7 +1957,9 @@ This is the page to look at every day. From the top:
   download has an orange bar. **Open Downloads** leads to the full list;
 - **Traffic** — the chart of the last 30 minutes (download and upload as smooth
   curves with a shaded area below, with the peak and the limit in force; with
-  eD2k, aMule as dashed lines) and the bandwidth of the last 30 days. The scale
+  eD2k, aMule as dashed lines; direct HTTP downloads, such as comics, enter the
+  download curve and appear in the legend as an *HTTP* entry) and the bandwidth
+  of the last 30 days. The scale
   starts at 256 KB/s: background traffic of a few KB/s (DHT, eD2k) stays a thin
   line at the bottom instead of looking like a transfer, and the exact figures
   stay in the legend. Each point averages about twenty seconds, so a burst of an

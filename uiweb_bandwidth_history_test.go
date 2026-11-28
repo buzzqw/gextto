@@ -248,25 +248,74 @@ func TestV2TrafficViewCurvesAreTheWholeTraffic(t *testing.T) {
 	}
 }
 
+// TestHTTPDownloadsRateMeasuresTheGrowthBetweenSamples: the comics module
+// reports the bytes moved, not a speed, so the chart takes the growth of those
+// counters between two ticks. A new download has no baseline in its first
+// interval, and one that ended is not read as a drop.
+func TestHTTPDownloadsRateMeasuresTheGrowthBetweenSamples(t *testing.T) {
+	id := registerHTTPDownload("Comic", "http", "https://example.test/file.cbz")
+	t.Cleanup(func() { removeHTTPDownload(id) })
+	updateHTTPDownload(id, func(download *ComicDownload) { download.DownloadedBytes = 1 << 20 })
+	previous := map[string]uint64{}
+	base := time.Now()
+	if got := httpDownloadsRate(previous, base, base.Add(rateSampleInterval)); got != 0 {
+		t.Fatalf("first sample = %d, want no baseline yet", got)
+	}
+	updateHTTPDownload(id, func(download *ComicDownload) { download.DownloadedBytes = 11 << 20 })
+	if got, want := httpDownloadsRate(previous, base.Add(rateSampleInterval), base.Add(2*rateSampleInterval)), uint64(1<<20); got != want {
+		t.Fatalf("rate = %d, want %d (10 MiB in one interval)", got, want)
+	}
+	updateHTTPDownload(id, func(download *ComicDownload) { download.Status = "completed" })
+	if got := httpDownloadsRate(previous, base.Add(2*rateSampleInterval), base.Add(3*rateSampleInterval)); got != 0 {
+		t.Fatalf("rate after completion = %d, want 0", got)
+	}
+}
+
+// TestV2TrafficViewCountsHTTPDownloads: the direct HTTP downloads (the comics
+// module) are part of the whole traffic, so a comic downloading alone lifts
+// the curve and the peak and appears in the breakdown.
+func TestV2TrafficViewCountsHTTPDownloads(t *testing.T) {
+	cfg := DefaultConfig()
+	state := trafficTestState(&cfg)
+	now := time.Now()
+	for i := 0; i < 6; i++ {
+		state.rate_history.add(rateSample{
+			At:       now.Add(time.Duration(i-6) * rateSampleInterval),
+			HTTPDown: 3 << 20,
+		})
+	}
+	view := v2TrafficViewFrom(state)
+	if view.PeakDown != "3.0 MB/s" {
+		t.Fatalf("peak = %q, want the HTTP download at 3.0 MB/s", view.PeakDown)
+	}
+	if !view.HasHTTP || view.CurrentHTTPDown != "3.0 MB/s" {
+		t.Fatalf("HTTP breakdown = %v/%q, want it shown", view.HasHTTP, view.CurrentHTTPDown)
+	}
+}
+
 // TestV2LiveTrafficTemplateRendersChart renders the fragment the SSE stream
 // pushes and checks the accessible SVG plus the limit line are present.
 func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
 	view := v2TrafficView{
-		HasData:     true,
-		Width:       trafficChartWidth,
-		Height:      trafficChartHeight,
-		DownLine:    "M0,160 C200,100 400,40 600,0",
-		DownArea:    "M0,160 C200,100 400,40 600,0 L600,160 L0,160 Z",
-		UpLine:      "M0,160 C200,120 400,100 600,80",
-		UpArea:      "M0,160 C200,120 400,100 600,80 L600,160 L0,160 Z",
-		HasLimit:    true,
-		LimitY:      "20",
-		LimitLabel:  "1.0 MB/s",
-		CurrentDown: "1.0 MB/s",
-		CurrentUp:   "512 KB/s",
-		PeakDown:    "2.0 MB/s",
-		PeakUp:      "1.0 MB/s",
-		ScaleLabel:  "2.0 MB/s",
+		HasData:         true,
+		Width:           trafficChartWidth,
+		Height:          trafficChartHeight,
+		DownLine:        "M0,160 C200,100 400,40 600,0",
+		DownArea:        "M0,160 C200,100 400,40 600,0 L600,160 L0,160 Z",
+		UpLine:          "M0,160 C200,120 400,100 600,80",
+		UpArea:          "M0,160 C200,120 400,100 600,80 L600,160 L0,160 Z",
+		HasLimit:        true,
+		LimitY:          "20",
+		LimitLabel:      "1.0 MB/s",
+		CurrentDown:     "1.0 MB/s",
+		CurrentUp:       "512 KB/s",
+		PeakDown:        "2.0 MB/s",
+		PeakUp:          "1.0 MB/s",
+		ScaleLabel:      "2.0 MB/s",
+		HasHTTP:         true,
+		TorrentDown:     "1.0 MB/s",
+		TorrentUp:       "0 B/s",
+		CurrentHTTPDown: "3.0 MB/s",
 	}
 	var buffer bytes.Buffer
 	if err := v2Templates.ExecuteTemplate(&buffer, "v2_live_traffic", view); err != nil {
@@ -284,6 +333,11 @@ func TestV2LiveTrafficTemplateRendersChart(t *testing.T) {
 		`fill="url(#v2-traffic-up)"`,
 		`<linearGradient id="v2-traffic-up"`,
 		`traffic-limit`,
+		// The breakdown names the HTTP downloads too, so the total is
+		// explained when a comic is the only thing transferring.
+		`class="muted traffic-breakdown"`,
+		`>HTTP</span>`,
+		`3.0 MB/s`,
 		// The peaks of the window name themselves: next to the current rates
 		// an unlabelled 380.6 KB/s read as a second, contradictory upload
 		// speed.

@@ -5282,7 +5282,7 @@ fra:
   "Nessun trasferimento negli ultimi 30 minuti.": "Aucun transfert au cours des 30 dernières minutes."
   "Grafico della banda di rete, ultimi 30 minuti": "Graphique de bande passante réseau, 30 dernières minutes"
   "Grafico del traffico totale di download e upload, ultimi 30 minuti": "Graphique du trafic total de téléchargement et d'envoi, 30 dernières minutes"
-  "Velocità di download totale: torrent e aMule": "Vitesse de téléchargement totale : torrents et aMule"
+  "Velocità di download totale: torrent, aMule e download HTTP": "Vitesse de téléchargement totale : torrents, aMule et téléchargements HTTP"
   "Velocità di upload totale: torrent e aMule": "Vitesse d'envoi totale : torrents et aMule"
   "Ripartizione della velocità totale": "Répartition de la vitesse totale"
 

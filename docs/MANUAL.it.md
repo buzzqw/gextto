@@ -1988,7 +1988,9 @@ le chiavi in [Chiavi di accesso](api-keys.it.md).
   completa;
 - **Traffico** — il grafico degli ultimi 30 minuti (download e upload come curve
   morbide con l'area sfumata sotto, con il picco e il limite in vigore; con
-  eD2k, aMule a linee tratteggiate) e la banda degli ultimi 30 giorni. La scala
+  eD2k, aMule a linee tratteggiate; i download diretti via HTTP, come i fumetti,
+  entrano nella curva del download e nella legenda come voce *HTTP*) e la banda
+  degli ultimi 30 giorni. La scala
   parte da 256 KB/s: il traffico di fondo di pochi KB/s (DHT, eD2k) resta una
   linea sottile in basso invece di sembrare un trasferimento, e le cifre esatte
   restano nella legenda. Ogni punto è la media di una ventina di secondi, così

@@ -101,7 +101,7 @@
   </article>
   <article class="dash-tile">
     <h3>{{tr "Rete"}}</h3>
-    <div class="dash-big" {{ed2kTitle "Velocità di download totale: torrent e aMule"}}><span class="dash-down" aria-hidden="true">↓</span> {{tr .Download}}</div>
+    <div class="dash-big" {{ed2kTitle "Velocità di download totale: torrent, aMule e download HTTP"}}><span class="dash-down" aria-hidden="true">↓</span> {{tr .Download}}</div>
     <div class="dash-line"><span class="dash-up" aria-hidden="true">↑</span> <span {{ed2kTitle "Velocità di upload totale: torrent e aMule"}}>{{tr .Upload}}</span>{{if gt .LatencyMs 0}} · <span {{trTitle "Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità"}}><span>{{tr "latenza"}}</span> <strong>{{.LatencyMs}} ms</strong></span>{{end}}</div>
     <div class="dash-line"><span>{{tr "peer"}}</span> <strong>{{.Peers}}</strong>{{if .HasDHT}} · <span>{{tr "DHT"}}</span> <strong>{{.DHTNodes}}</strong> <span>{{tr "nodi"}}</span>{{end}}</div>
     {{if .Port}}<div class="dash-line" {{trTitle "Se la porta del motore torrent riceve connessioni da fuori: aperta sul router con UPnP/NAT-PMP, oppure raggiunta da peer e DHT"}}><span>{{tr "porta"}}</span> <strong class="{{if .PortOK}}dash-ok{{else}}dash-warn{{end}}">{{tr .Port}}</strong></div>{{end}}
@@ -211,9 +211,9 @@
 {{define "v2_live_traffic"}}
 <div id="v2-live-traffic" class="traffic">
   <div class="traffic-legend">
-    <span class="traffic-stat down" {{ed2kTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> {{tr .CurrentDown}}</span>
+    <span class="traffic-stat down" {{ed2kTitle "Velocità di download totale: torrent, aMule e download HTTP"}}><span aria-hidden="true">↓</span> {{tr .CurrentDown}}</span>
     <span class="traffic-stat up" {{ed2kTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> {{tr .CurrentUp}}</span>
-    {{if .HasEd2k}}<span class="muted traffic-breakdown" {{trTitle "Ripartizione della velocità totale"}}><span>{{tr "Torrent"}}</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>{{tr "eD2k"}}</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span></span>{{end}}
+    {{if or .HasEd2k .HasHTTP}}<span class="muted traffic-breakdown" {{trTitle "Ripartizione della velocità totale"}}><span>{{tr "Torrent"}}</span> ↓ {{.TorrentDown}} ↑ {{.TorrentUp}}{{if .HasEd2k}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>{{tr "eD2k"}}</span> <span class="traffic-ed2k-figure">↓ {{.CurrentEd2kDown}} ↑ {{.CurrentEd2kUp}}</span>{{end}}{{if .HasHTTP}} <span class="traffic-breakdown-sep" aria-hidden="true">·</span> <span>{{tr "HTTP"}}</span> <span class="traffic-http-figure">↓ {{.CurrentHTTPDown}}</span>{{end}}</span>{{end}}
     {{if and .HasData (not .Idle)}}<span class="muted traffic-peak"><span class="traffic-peak-figure" {{trTitle "Picco di download nel periodo"}}><span class="traffic-peak-label">{{tr "Picco download"}}</span> {{tr .PeakDown}}</span>
     <span class="traffic-peak-figure" {{trTitle "Picco di upload nel periodo"}}><span class="traffic-peak-label">{{tr "Picco upload"}}</span> {{tr .PeakUp}}</span></span>{{end}}
     {{if .HasLimit}}<span class="badge warn" {{trTitle "Limite di banda attivo"}}>{{tr "Limite"}} <strong>{{tr .LimitLabel}}</strong></span>{{else if .Auto}}<span class="badge" {{trTitle "Auto attivo: Gextto misura la linea e adatta la velocità, senza un tetto fisso"}}>{{tr "Auto"}}</span>{{else}}<span class="badge" {{trTitle "Nessun limite di banda attivo"}}>{{tr "Nessun limite"}}</span>{{end}}

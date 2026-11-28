@@ -3,12 +3,14 @@ package gextto
 // uiweb_bandwidth_history.go keeps a short in-memory history of the aggregate
 // transfer rates and turns it into the small bandwidth chart on the Dashboard.
 //
-// A dedicated background worker samples the summed engine rates on a fixed
-// interval into a bounded ring buffer, so the history is the same whether one
-// tab is open or none: the graph shows what actually happened in the last half
-// hour, not just since the page was opened. The chart itself is rendered as an
-// SVG on the server (no charting library, theme-aware through CSS variables)
-// and refreshed by the existing chrome SSE stream.
+// A dedicated background worker samples the summed rates on a fixed interval
+// into a bounded ring buffer, so the history is the same whether one tab is
+// open or none: the graph shows what actually happened in the last half hour,
+// not just since the page was opened. The total is the whole traffic — the
+// torrent engine, aMule and the direct HTTP downloads (the comics module).
+// The chart itself is rendered as an SVG on the server (no charting library,
+// theme-aware through CSS variables) and refreshed by the existing chrome SSE
+// stream.
 
 import (
 	"math"
@@ -45,13 +47,15 @@ const (
 )
 
 // rateSample is one point of the history: the summed engine rates at a
-// moment, and aMule's rates apart (zero while eD2k is off).
+// moment, and aMule's and the HTTP downloads' rates apart (zero while they are
+// off). HTTP downloads only receive data, so they have no upload part.
 type rateSample struct {
 	At       time.Time
 	Down     uint64
 	Up       uint64
 	Ed2kDown uint64
 	Ed2kUp   uint64
+	HTTPDown uint64
 }
 
 // rateHistory is a fixed-size ring of rate samples, oldest first.
@@ -154,14 +158,26 @@ func v2RateOrZero(rate uint64) uint64 {
 }
 
 // v2SampleDown and v2SampleUp are the total rates of one history point: the
-// torrent rate Gextto sampled plus aMule's. Each part is floored on its own,
-// so the protocol chatter of one side never lifts the total curve.
+// torrent rate Gextto sampled plus aMule's and the HTTP downloads'. Each part
+// is floored on its own, so the protocol chatter of one side never lifts the
+// total curve.
 func v2SampleDown(sample rateSample) uint64 {
-	return v2RateOrZero(sample.Down) + v2RateOrZero(sample.Ed2kDown)
+	return v2RateOrZero(sample.Down) + v2RateOrZero(sample.Ed2kDown) + v2RateOrZero(sample.HTTPDown)
 }
 
 func v2SampleUp(sample rateSample) uint64 {
 	return v2RateOrZero(sample.Up) + v2RateOrZero(sample.Ed2kUp)
+}
+
+// v2LastHTTPDown is the HTTP download rate of the most recent sample. The
+// downloads module reports the bytes moved, not a speed, so the worker
+// measures the growth between two samples; between two ticks the last
+// measurement is the freshest figure available.
+func v2LastHTTPDown(samples []rateSample) uint64 {
+	if len(samples) == 0 {
+		return 0
+	}
+	return v2RateOrZero(samples[len(samples)-1].HTTPDown)
 }
 
 // v2TrafficView is the data the bandwidth chart template needs. Points and
@@ -199,6 +215,11 @@ type v2TrafficView struct {
 	Ed2kUpLine      string
 	CurrentEd2kDown string
 	CurrentEd2kUp   string
+	// The direct HTTP downloads (the comics module) have no lines of their
+	// own: they become visible in the total and in the breakdown while one is
+	// transferring.
+	HasHTTP         bool
+	CurrentHTTPDown string
 }
 
 // v2TrafficViewFrom builds the chart from the rate history and the effective
@@ -210,18 +231,31 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		Height: trafficChartHeight,
 	}
 	// The headline figures and the two solid curves are the whole traffic:
-	// torrents plus aMule. The per-source numbers stay beside them, so aMule's
-	// share is still readable.
+	// torrents, aMule and the direct HTTP downloads. The per-source numbers
+	// stay beside them, so each share is still readable.
 	down, up := v2CurrentRates(s)
 	ed2kDown, ed2kUp := v2Ed2kRates(s)
 	view.HasEd2k = s != nil && ed2kEnabled(latestConfig(s))
+
+	var samples []rateSample
+	if s != nil && s.rate_history != nil {
+		samples = s.rate_history.snapshot()
+	}
+	// HTTP downloads report the bytes moved, not a speed: the worker measures
+	// the growth between two samples, so the last one is the freshest figure
+	// available for the legend.
+	httpDown := v2LastHTTPDown(samples)
+	view.HasHTTP = httpDown > 0
 	view.TorrentDown = logging.HumanRate(saturatingInt64(down))
 	view.TorrentUp = logging.HumanRate(saturatingInt64(up))
-	view.CurrentDown = logging.HumanRate(saturatingInt64(down + ed2kDown))
+	view.CurrentDown = logging.HumanRate(saturatingInt64(down + ed2kDown + httpDown))
 	view.CurrentUp = logging.HumanRate(saturatingInt64(up + ed2kUp))
 	if view.HasEd2k {
 		view.CurrentEd2kDown = logging.HumanRate(saturatingInt64(ed2kDown))
 		view.CurrentEd2kUp = logging.HumanRate(saturatingInt64(ed2kUp))
+	}
+	if view.HasHTTP {
+		view.CurrentHTTPDown = logging.HumanRate(saturatingInt64(httpDown))
 	}
 
 	// The limit line mirrors the same precedence the daemon applies to the
@@ -234,10 +268,6 @@ func v2TrafficViewFrom(s *AppState) v2TrafficView {
 		view.Auto = true
 	}
 
-	var samples []rateSample
-	if s != nil && s.rate_history != nil {
-		samples = s.rate_history.snapshot()
-	}
 	// Only the window is drawn: an older sample would pile up on the left edge.
 	start := time.Now().Add(-rateHistoryWindow)
 	for len(samples) > 0 && samples[0].At.Before(start) {
@@ -417,6 +447,43 @@ func svgNumber(value float64) string {
 	return strconv.FormatFloat(math.Round(value*10)/10, 'f', -1, 64)
 }
 
+// httpDownloadsRate measures how fast the direct HTTP downloads (the comics
+// module) are moving between two samples. The module reports the bytes
+// received, not the speed, and the average since the start of the transfer
+// would flatten every change of speed and keep the first burst in the chart:
+// the rate comes from the growth of their byte counters between two ticks.
+// The map holds the previous counters and is refreshed in place, so a
+// download that starts or ends is never read as a jump.
+func httpDownloadsRate(previous map[string]uint64, since, now time.Time) uint64 {
+	if previous == nil {
+		return 0
+	}
+	elapsed := now.Sub(since).Seconds()
+	if elapsed <= 0 {
+		elapsed = rateSampleInterval.Seconds()
+	}
+	current := make(map[string]uint64, len(previous))
+	var down uint64
+	for _, download := range HTTPDownloads() {
+		if download.Status != "downloading" {
+			continue
+		}
+		current[download.ID] = download.DownloadedBytes
+		last, seen := previous[download.ID]
+		if !seen || download.DownloadedBytes <= last {
+			continue // no baseline yet, or nothing moved
+		}
+		down += uint64(float64(download.DownloadedBytes-last) / elapsed)
+	}
+	for id := range previous {
+		delete(previous, id)
+	}
+	for id, bytes := range current {
+		previous[id] = bytes
+	}
+	return v2RateOrZero(down)
+}
+
 // bandwidthHistoryWorker records one rate sample per interval until shutdown.
 func bandwidthHistoryWorker(s *AppState) {
 	if s == nil || s.rate_history == nil {
@@ -424,6 +491,10 @@ func bandwidthHistoryWorker(s *AppState) {
 	}
 	ticker := time.NewTicker(rateSampleInterval)
 	defer ticker.Stop()
+	// The HTTP downloads' counters at the previous tick, kept here because
+	// this worker is the only sampler.
+	httpPrevious := map[string]uint64{}
+	httpPreviousAt := time.Now()
 	for {
 		select {
 		case <-s.bgStop:
@@ -437,7 +508,9 @@ func bandwidthHistoryWorker(s *AppState) {
 				up += view.UploadRate
 			}
 			ed2kDown, ed2kUp := v2Ed2kRates(s)
-			s.rate_history.add(rateSample{At: now, Down: v2RateOrZero(down), Up: v2RateOrZero(up), Ed2kDown: ed2kDown, Ed2kUp: ed2kUp})
+			httpDown := httpDownloadsRate(httpPrevious, httpPreviousAt, now)
+			httpPreviousAt = now
+			s.rate_history.add(rateSample{At: now, Down: v2RateOrZero(down), Up: v2RateOrZero(up), Ed2kDown: ed2kDown, Ed2kUp: ed2kUp, HTTPDown: httpDown})
 			s.rate_history.torrents.record(now, views)
 			sampleSessionTotals(s)
 		}
