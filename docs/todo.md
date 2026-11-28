@@ -18,7 +18,7 @@ here.
 The four sections are the triage: **Now** (clear value, low cost), **Measure**
 (clear value, but a number or a refactor comes first), **Plan** (medium value: a
 product decision or a UX improvement), **Later** (foundations and large
-features). 7 + 9 + 13 + 6 = 35 items.
+features). 7 + 9 + 14 + 6 = 36 items.
 
 ## Now
 
@@ -48,6 +48,7 @@ features). 7 + 9 + 13 + 6 = 35 items.
 - **gx-core — completion and interest scans**: every completed piece rescans the bitfield (`wantedComplete`) and every peer (`peerHasWanted`). Gate: a profile on a 100,000-piece torrent first; if it matters, a running count of wanted pieces still missing.
 - **gx-torrent daemon — `/sync/maindata` history**: each poll builds a full map of every torrent and keeps up to 16 of them (about 96 MiB at 5,000 torrents). Gate: shared copy-on-write snapshots or per-rid diffs, benchmarked at 1k/5k/10k torrents.
 - **TUI — selection, stream limits and maintenance errors**: a refresh can move the selection after an HTTP/eD2k row is inserted, SSE lines and events have no byte limit, and a backup error is cleared by the next successful maintenance call. Gate: keep the selection by identity, cap lines and events, record errors per endpoint.
+- **Gextto — a download that holds another film** *(decision)*: the title and the year are checked on the release name before downloading, so an uploader who publishes a different film under the requested name still lands in the library under that name (the report of a film of the list replaced by another). Gate: a signal to compare after the download — the file's own title tag, its runtime or an external id — and a decision on refusing it or only flagging it.
 - **Quality profiles — movie and series scope** *(decision)*: the same profile serves both libraries and the request-manager picker cannot filter by type. Gate: decide whether to add a `kind` field (movie/series/both, default both) and filter the pickers.
 - **Quality profiles — linked titles** *(decision)*: a profile is copied into a title at save time and titles do not store its id, so editing a profile never reaches existing titles. Gate: decide whether to keep copy-only semantics or add a "re-apply to linked titles" action with a preview of the affected titles.
 - **qBittorrent-compatible API — rules** *(decision)*: the native page keeps rules only as an advanced fallback, but `/api/v2/rss/rules/*` still exposes them to external clients, and the one-time migration switches stored rules off for those clients too. Gate: decide whether external clients still need that surface or the API should report no rules and the compatibility note in `gx-core.md` be updated.
