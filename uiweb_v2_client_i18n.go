@@ -92,6 +92,7 @@ var v2ClientKeys = []string{
 	"es. Noto Sans",
 	"Applica",
 	"Sistema",
+	"Geist (predefinito)",
 	"font rilevati.",
 	"⏸ Ferma scorrimento",
 	"▶ Segui ultime righe",

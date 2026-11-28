@@ -18,8 +18,10 @@ test("dashboard and configuration areas are usable", async ({ page }) => {
 
   await expect(page).toHaveTitle(/Gextto/);
   await expect(page.locator("h1").filter({ hasText: "Dashboard" })).toBeVisible();
-  await expect(page.getByText("Ricerca automatica")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ricerca automatica" })).toBeVisible();
   await expect(page.locator(".dashboard-traffic-panel")).toBeVisible();
+  // The feed panel is closed on the Dashboard: open it first.
+  await page.locator(".dashboard-feed-panel > summary").click();
   await page.getByRole("button", { name: "Carica risultati" }).click();
   await expect(page.locator("#v2-dashboard-feed")).not.toContainText("Premi \"Carica risultati\"", { timeout: 15000 });
 

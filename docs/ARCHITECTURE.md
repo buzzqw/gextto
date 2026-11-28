@@ -234,7 +234,7 @@ qBittorrent-nox.
 | `uiweb_pages.go` | data-driven list/action pages. |
 | `uiweb_sections.go` | reusable sections (table, actions, form, progress...). |
 | `uiweb_detail.go` | series/movie detail pages. |
-| `uiweb_shell.go` | UI "chrome": top bar, sidebar, status. |
+| `uiweb_shell.go` | UI "chrome": top bar, sidebar, status. The clock is sent once (epoch and time zone offset) and kept by the browser. The Geist fonts (`uiweb/v2/static/geist-*.woff2`, SIL OFL in `geist-OFL.txt`) are served from the binary. |
 | `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | Configuration page: areas, sections and index with the panel (`Group`) of each setting; units, special values, control type and the toggle it depends on; defaults; descriptions. |
 | `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
 | `uiweb_v2_tr.go` | render-time translation: one parsed template set per language with `tr`/`trTitle` bound to its dictionary, and `v2TranslateFragment` for markup Go assembles. |
@@ -250,6 +250,7 @@ qBittorrent-nox.
 | `uiweb_v2_setup.go` | guided first-start configuration (`/?view=setup`). |
 | `uiweb_v2_pwa.go` | PWA support (installation as an app, magnet/`.torrent` sharing). |
 | `uiweb_v2_problems.go` | "To check" dashboard (what needs attention). |
+| `uiweb_v2_dashboard_live.go` | live parts of the Dashboard: the strip of figures (refreshed by the chrome SSE stream), "Downloading now", the health summary, the week of releases, and the speed bars at the foot of the sidebar. |
 | `uiweb_v2_client_i18n.go` | dictionary for the strings set at runtime by the client. |
 
 ## 4. File naming conventions

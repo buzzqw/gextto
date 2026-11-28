@@ -76,8 +76,25 @@ type uiShellChrome struct {
 	// processes. Each is shown only when that process runs on this machine.
 	AmuleLoad string
 	GxLoad    string
-	Download  string
-	Upload    string
+	// The same figures split, for the Dashboard "Carico" tile: CPU and RAM as
+	// labels, and the CPU as a number for its bar.
+	CPUPercent      float64
+	GxCPU           string
+	GxRAM           string
+	GxCPUPercent    float64
+	AmuleCPU        string
+	AmuleRAM        string
+	AmuleCPUPercent float64
+	// ClockEpoch (ms) and ClockOffset (minutes east of UTC) let the page keep
+	// the server clock by itself; CurrentDate is the day shown under the time.
+	ClockEpoch  int64
+	ClockOffset int
+	CurrentDate string
+	// SideBars are the heights (percent) of the speed bars at the foot of the
+	// sidebar, one per minute and a half of the last 30 minutes.
+	SideBars []int
+	Download string
+	Upload   string
 	// LatencyMs is the ping Auto measured, shown next to the download metric;
 	// 0 when Auto is off or has no sample yet.
 	LatencyMs int64
@@ -143,7 +160,8 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		AssetVersion: constants.Build + "-" + v2StaticFingerprint(),
 		DryRun:       cfg.DryRun,
 		Status:       "offline",
-		CurrentTime:  uiNowClock(),
+		CurrentTime:  time.Now().Format("15:04"),
+		CurrentDate:  time.Now().Format("02/01"),
 		CPU:          "—",
 		CPUFrequency: currentCPUFrequency(),
 		RAM:          "0 B",
@@ -170,18 +188,25 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	chrome.Status = s.health_status.update(rawStatus, time.Now())
 	if metrics.ProcessCPUPercent != nil {
 		chrome.CPU = strconv.FormatFloat(*metrics.ProcessCPUPercent, 'f', 1, 64) + "%"
+		chrome.CPUPercent = *metrics.ProcessCPUPercent
 	}
+	now := time.Now()
+	_, zoneOffset := now.Zone()
+	chrome.ClockEpoch = now.UnixMilli()
+	chrome.ClockOffset = zoneOffset / 60
 	chrome.RAM = logging.HumanBytesI64(saturatingInt64(metrics.ResidentBytes))
 	if reporter, ok := s.activeEngine().(LocalProcessReporter); ok {
 		if pid, ok := reporter.LocalProcessPID(); ok {
 			if usage, ok := localProcessUsageForPIDs([]int{pid}); ok {
 				chrome.GxLoad = localProcessLoadLabel(usage)
+				chrome.GxCPU, chrome.GxRAM, chrome.GxCPUPercent = localProcessLoadParts(usage)
 			}
 		}
 	}
 	if ed2kEnabled(cfg) && hostIsLocal(uiSettingString(cfg, "amule_host")) {
 		if usage, ok := localProcessUsageForName("amuled"); ok {
 			chrome.AmuleLoad = localProcessLoadLabel(usage)
+			chrome.AmuleCPU, chrome.AmuleRAM, chrome.AmuleCPUPercent = localProcessLoadParts(usage)
 		}
 	}
 
@@ -235,6 +260,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	downloadRate += ed2kDown
 	uploadRate += ed2kUp
 	chrome.ActiveDownloads = strconv.Itoa(activeDl) + "/" + strconv.Itoa(totalDl)
+	chrome.SideBars = v2SideBars(s)
 	chrome.Download = logging.HumanRate(saturatingInt64(downloadRate))
 	chrome.Upload = logging.HumanRate(saturatingInt64(uploadRate))
 	if guard := s.latency_guard.status(); guard.Measuring {

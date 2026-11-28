@@ -48,9 +48,9 @@ func (t v2Theme) Light() bool { return v2ThemeLuminance(t.Bg) > 0.4 }
 // here only draw the preview and seed the editor. "auto" has no palette of its
 // own: it follows the operating system and paints itself with light or dark.
 var v2BuiltinThemes = []v2Theme{
-	{ID: "auto", Name: "Automatico", Mode: "auto", Bg: "#0b1120", Surface: "#131c2e", Text: "#e9f0fb", Accent: "#4fd6a1"},
-	{ID: "dark", Name: "Scuro", Mode: "dark", Bg: "#0b1120", Surface: "#131c2e", Text: "#e9f0fb", Accent: "#4fd6a1"},
-	{ID: "light", Name: "Chiaro", Mode: "light", Bg: "#d6e0ea", Surface: "#edf1f7", Text: "#2a3444", Accent: "#08704f"},
+	{ID: "auto", Name: "Automatico", Mode: "auto", Bg: "#0b0c0f", Surface: "#131419", Text: "#eef0f4", Accent: "#3ddc97"},
+	{ID: "dark", Name: "Scuro", Mode: "dark", Bg: "#0b0c0f", Surface: "#131419", Text: "#eef0f4", Accent: "#3ddc97"},
+	{ID: "light", Name: "Chiaro", Mode: "light", Bg: "#eceef2", Surface: "#ffffff", Text: "#161922", Accent: "#08704f"},
 	{ID: "cream", Name: "Crema", Mode: "cream", Bg: "#f4ecda", Surface: "#fbf6ea", Text: "#3a3222", Accent: "#1f6b47"},
 }
 

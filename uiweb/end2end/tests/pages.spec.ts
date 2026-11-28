@@ -91,74 +91,56 @@ test("il pulsante Aggiungi torrent è in ogni pagina e apre il modulo su Scarico
   await expect(page.locator('input[name="magnet"]')).toBeFocused();
 });
 
-test("Aggiorna e lo stato restano nella riga di Aggiungi torrent", async ({ page }) => {
+test("stato, metriche e comandi stanno su una riga, il titolo sotto", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
-  await page.goto("/");
+  await page.goto("/?view=downloads");
   const chrome = await page.evaluate(() => {
     const box = (selector: string) => {
       const element = document.querySelector(selector);
       if (!element) return null;
       const rect = element.getBoundingClientRect();
-      return {
-        inActions: element.closest(".top-actions") !== null,
-        x: Math.round(rect.x),
-        middle: Math.round(rect.y + rect.height / 2),
-      };
+      return { x: Math.round(rect.x), top: Math.round(rect.top), bottom: Math.round(rect.bottom), middle: Math.round(rect.y + rect.height / 2) };
     };
     return {
-      add: box("[data-add-torrent-toggle]"),
-      refresh: box(".btn-refresh"),
-      status: box("#v2-live-status"),
-      // #v2-live-status uses display:contents on the desktop, so its own box
-      // is empty: the pill is the element that has a position.
       pill: box(".system-pill"),
+      metrics: box("#v2-live-top-metrics .top-metric"),
+      clock: box(".current-time"),
+      refresh: box(".btn-refresh"),
+      appearance: box(".appearance-toggle"),
+      add: box("[data-add-torrent-toggle]"),
+      title: box(".topbar-title h1"),
     };
   });
-  // Refresh and the service state are part of the same row as the add button,
-  // to its right, not in the controls row below.
-  expect(chrome.add).not.toBeNull();
-  expect(chrome.refresh?.inActions).toBe(true);
-  expect(chrome.status?.inActions).toBe(true);
-  expect(chrome.pill).not.toBeNull();
-  expect(chrome.add!.x).toBeLessThan(chrome.refresh!.x);
-  expect(chrome.refresh!.x).toBeLessThan(chrome.pill!.x);
-  expect(Math.abs(chrome.add!.middle - chrome.refresh!.middle)).toBeLessThanOrEqual(3);
-  expect(Math.abs(chrome.refresh!.middle - chrome.pill!.middle)).toBeLessThanOrEqual(3);
+  for (const key of ["pill", "metrics", "clock", "refresh", "appearance", "add", "title"] as const) {
+    expect(chrome[key], key).not.toBeNull();
+  }
+  // Left to right: state, live figures, clock, Aggiorna, Aspetto, Aggiungi.
+  expect(chrome.pill!.x).toBeLessThan(chrome.metrics!.x);
+  expect(chrome.metrics!.x).toBeLessThan(chrome.clock!.x);
+  expect(chrome.clock!.x).toBeLessThan(chrome.refresh!.x);
+  expect(chrome.refresh!.x).toBeLessThan(chrome.appearance!.x);
+  expect(chrome.appearance!.x).toBeLessThan(chrome.add!.x);
+  for (const key of ["metrics", "clock", "refresh", "appearance", "add"] as const) {
+    expect(Math.abs(chrome[key]!.middle - chrome.pill!.middle), key).toBeLessThanOrEqual(4);
+  }
+  // The page title is on its own row, under the controls.
+  expect(chrome.title!.top).toBeGreaterThanOrEqual(chrome.add!.bottom);
 });
 
-test("il riepilogo della Dashboard vive nella barra in alto, accanto al menu Aspetto", async ({ page }) => {
+test("la Dashboard apre con la fascia dei numeri, senza ripeterli nella barra in alto", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.goto("/");
-  const kpis = page.locator(".top-kpis");
-  await expect(kpis).toBeVisible();
-  // The badges are part of the header controls, beside the Aspetto menu, and no
-  // longer occupy a row of their own in the page body.
-  await expect(page.locator(".dashboard-summary-grid")).toHaveCount(0);
-  await expect(page.locator(".top-kpi")).toHaveCount(2);
-  const positions = await page.evaluate(() => {
-    const kpis = document.querySelector(".top-kpis");
-    const appearance = document.querySelector(".top-controls .appearance-toggle");
-    const controls = document.querySelector(".top-controls");
-    const clock = document.querySelector(".current-time");
-    if (!kpis || !appearance || !controls || !clock) return null;
-    const kpiBox = kpis.getBoundingClientRect();
-    const clockBox = clock.getBoundingClientRect();
-    return {
-      insideControls: kpis.closest(".top-controls") === controls,
-      kpiX: Math.round(kpiBox.x),
-      appearanceX: Math.round(appearance.getBoundingClientRect().x),
-      kpiRight: Math.round(kpiBox.right),
-      clockRight: Math.round(clockBox.right),
-    };
-  });
-  expect(positions).not.toBeNull();
-  expect(positions!.insideControls).toBe(true);
-  // The two badges sit at the left of the row, the Aspetto menu after them.
-  expect(positions!.kpiX).toBeLessThan(positions!.appearanceX);
-  expect(positions!.kpiRight).toBeLessThan(positions!.appearanceX);
-  // Only the Dashboard carries them.
-  await page.goto("/?view=downloads");
+  await expect(page.locator("#v2-dash-stats")).toBeVisible();
+  await expect(page.locator("#v2-dash-stats .dash-tile")).toHaveCount(5);
+  await expect(page.locator("#v2-live-top-metrics")).toHaveCount(0);
   await expect(page.locator(".top-kpis")).toHaveCount(0);
+  await expect(page.locator("#v2-dash-now")).toBeVisible();
+  await expect(page.locator("#v2-dash-health")).toBeVisible();
+  await expect(page.locator(".dash-week .dash-day")).toHaveCount(7);
+  // Every other page keeps the live figures in the top bar and has no strip.
+  await page.goto("/?view=downloads");
+  await expect(page.locator("#v2-dash-stats")).toHaveCount(0);
+  await expect(page.locator("#v2-live-top-metrics")).toHaveCount(1);
 });
 
 test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page }) => {

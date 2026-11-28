@@ -281,36 +281,50 @@ problem becomes hard to reproduce.
 On a computer every entry has its icon beside the name and every area its name
 in small capitals: the column is read at a glance. At the foot of the menu,
 below the areas, are the **Manual**, the **Changelog** and the **Licence**: they
-are pages to read, so they sit there as small links. When the entries do not fit
-on the screen only the list of pages scrolls: the brand, the documentation and
-the state line stay put. On a phone the bottom bar is unchanged, and the manual,
+are pages to read, so they sit there as small links. Further down is a small
+panel with the **live** download and upload **speeds**, a bar chart of the last
+30 minutes (each bar is a minute and a half) and the *active* or *dry-run*
+state. When the entries do not fit on the screen only the list of pages
+scrolls: the brand, the documentation and the panel stay put. On a phone the bottom bar is unchanged, and the manual,
 the changelog and the licence are in the **More** panel.
 
 ### The top bar
 
-- **Add torrent**, on every page: opens the form for a magnet, a URL or a
-  `.torrent` file (see [Adding a torrent or a magnet](#adding-a-torrent-or-a-magnet)).
+The bar reads left to right, on one row:
+
+- the **service state**: *ok* in green, *degraded* in orange when something is
+  wrong (folders, engine or disk), *offline* in red;
+- the **live figures**: CPU and RAM of Gextto and gx-torrent (with the CPU
+  frequency), of aMule when it is active and local, the download and upload
+  **speeds** (torrents plus aMule) with the latency Auto measures, the torrents
+  in the session and the connected peers/seeds. They refresh every 5 seconds and
+  stop when the browser tab is not in view. On a narrow screen the least
+  important ones hide (aMule first, then the secondary values) and the controls
+  on the right always stay on one row. They are not shown on the **Dashboard**:
+  the page opens with a fuller version of the same figures;
+- the **server time** with the day: the server writes it once, then the page
+  keeps it up to date by itself, with no further requests;
 - **Refresh**: asks for the page again and replaces only its content. The screen
   does not flash, the scroll position and the open panels stay where they are;
   the live figures keep updating on their own, so it is only needed when you
-  want to read the list again.
-- The download and upload **speeds** (torrents plus aMule) and **CPU and RAM
-  per process**: Gextto, gx-torrent and, when active and local, aMule. They
-  refresh every 5 seconds, and stop when the browser tab is not in view: they
-  pick up again as soon as you come back.
-- **Appearance**: a single button gathers theme, text size, font and language,
-  instead of six controls scattered across the top of every page. The menu shows
-  the four ready-made themes (Automatic, Dark, Light, Cream): **Automatic**
-  follows the light or dark theme of the system and changes with it. **More
-  themes and custom…** opens the full dialog, with Nord, Dracula, Solarized,
-  Gruvbox, High contrast and the others, in light and dark variants, and
-  **Customize** builds your own theme from four colours (background, panels,
-  text, accent), warning you when the contrast is too low. Saved themes live on
-  the server and follow you to every device; the active theme, text size and
-  font remain a choice of each browser.
-- The interface **language**.
-- **Donate**, bottom right (on a phone it is in the *More* menu), and **Update
-  available** when a new version is out.
+  want to read the list again;
+- **Appearance**: a single button gathers theme, text size, font and language.
+  The menu shows the four ready-made themes (Automatic, Dark, Light, Cream):
+  **Automatic** follows the light or dark theme of the system and changes with
+  it. **More themes and custom…** opens the full dialog, with Nord, Dracula,
+  Solarized, Gruvbox, High contrast and the others, in light and dark variants,
+  and **Customize** builds your own theme from four colours (background, panels,
+  text, accent), warning you when the contrast is too low. The default font is
+  **Geist**, shipped with Gextto, so it looks the same on every device; **Choose
+  the font** goes back to the system font or uses one you have installed. Saved
+  themes live on the server and follow you to every device; the active theme,
+  text size and font remain a choice of each browser;
+- **Add torrent**, on every page: opens the form for a magnet, a URL or a
+  `.torrent` file (see [Adding a torrent or a magnet](#adding-a-torrent-or-a-magnet)).
+
+Below it, on a row of its own, is the **page title**; in dry-run mode the
+**DRY-RUN** label sits beside it. **Donate** is bottom right (on a phone in the
+*More* menu), and **Update available** shows up when there is a new version.
 
 ### From a phone
 
@@ -1901,23 +1915,49 @@ browser. The full model is in [SECURITY.md](SECURITY.md); the keys in
 
 This is the page to look at every day. From the top:
 
-- **In session** — torrents downloading, stuck and seeding, the bandwidth of
-  the last 30 days and the **traffic chart** of the last 30 minutes (download
-  and upload, with the peak and the limit in force; with eD2k, aMule as dashed
-  lines);
+- **The strip of figures**, refreshed every 5 seconds:
+  - **Load** — CPU and RAM of Gextto, gx-torrent and, when active and local,
+    aMule, each with a bar; then the average load of the machine over the last
+    minute with the memory in use;
+  - **Network** — download and upload speeds, the latency Auto measures,
+    connected peers, DHT nodes and the state of the **port**: *open on the
+    router* when UPnP or NAT-PMP opened it, *reachable* when connections arrive
+    from outside, *maybe closed on the router* when nothing arrives (DHT and port
+    only with gx-torrent);
+  - **Torrents** — how many are really transferring, how many are stalled, how
+    many are seeding, and the connected peers/seeds;
+  - **Free space** — in the download folder, with the bar of the space used;
+  - **Magnets in the archive** — the releases in the archive and how many
+    Gextto remembers so it does not take them again;
+- **Downloading now** — the four downloads most worth a look (the ones
+  receiving data first, fastest on top), with the series poster when Gextto
+  knows it, the episode, the bar, the speed and the time left. A stalled
+  download has an orange bar. **Open Downloads** leads to the full list;
+- **Traffic** — the chart of the last 30 minutes (download and upload, with the
+  peak and the limit in force; with eD2k, aMule as dashed lines) and the
+  bandwidth of the last 30 days;
+- **Health** — one line per area, with a green or orange mark: active RSS feeds
+  and releases taken today, **indexers** (one dot per indexer, orange when
+  Gextto has paused it after errors), failing **integrations**, the **title
+  queue** with the next check, **eD2k** (High or Low ID, Kad) and writable
+  **folders**. On top it says «All good» or how many things to look at; **Open
+  Health** leads to the details. It refreshes every minute;
+- **This week** — the seven days from today, with the episodes due from the
+  series you follow and their posters; what airs later is listed below;
 - **To check** — stuck downloads (with reason and next retry), pending moves to
   the library, warnings and errors. A warning stays while the download is in
   the session and disappears by itself when it leaves with nothing pending;
   **Clean** marks them as read. When all is well it says «Nothing to check»;
-- **Manual search** and **Automatic search** — the next run, the outcome of the
-  last cycle and the buttons to start one (everything, or only Series, Movies,
-  Comics);
+- **Automatic search** — the outcome of the last cycle, the next run, the
+  interval, the **missing episodes** (the number opens the list) and the
+  buttons to start a cycle (everything, or only Series, Movies, Comics), with
+  **Backup** and **Configuration**;
+- **Search**, **Latest downloads** and **Latest found in the sources**, closed:
+  a click opens them;
 - **Background operations** — renames, scans, MediaInfo, integrity check,
-  searches for missing episodes: with the percentage and **Cancel**;
-- **Upcoming**, **latest downloads**, **recent activity** and **latest found**.
+  searches for missing episodes: with the percentage and **Cancel**.
 
-The **DRY-RUN** or **ACTIVE** badge at the top tells you whether Gextto really
-downloads.
+In dry-run mode the **DRY-RUN** label sits beside the page title.
 
 ### Health
 

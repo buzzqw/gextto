@@ -18,7 +18,7 @@ here.
 The four sections are the triage: **Now** (clear value, low cost), **Measure**
 (clear value, but a number or a refactor comes first), **Plan** (medium value: a
 product decision or a UX improvement), **Later** (foundations and large
-features). 7 + 9 + 11 + 6 = 33 items.
+features). 7 + 9 + 13 + 6 = 35 items.
 
 ## Now
 
@@ -51,6 +51,8 @@ features). 7 + 9 + 11 + 6 = 33 items.
 - **Quality profiles — movie and series scope** *(decision)*: the same profile serves both libraries and the request-manager picker cannot filter by type. Gate: decide whether to add a `kind` field (movie/series/both, default both) and filter the pickers.
 - **Quality profiles — linked titles** *(decision)*: a profile is copied into a title at save time and titles do not store its id, so editing a profile never reaches existing titles. Gate: decide whether to keep copy-only semantics or add a "re-apply to linked titles" action with a preview of the affected titles.
 - **qBittorrent-compatible API — rules** *(decision)*: the native page keeps rules only as an advanced fallback, but `/api/v2/rss/rules/*` still exposes them to external clients, and the one-time migration switches stored rules off for those clients too. Gate: decide whether external clients still need that surface or the API should report no rules and the compatibility note in `gx-core.md` be updated.
+- **Gextto UI — traffic history beyond 30 minutes**: the Dashboard chart and the sidebar bars only know the last 30 minutes, kept in memory, so the 24 h, 7 days and 30 days views of the new Dashboard are missing. Gate: an hourly aggregate of the rate samples saved on disk, with a bounded size, then the period switch on the chart.
+- **Gextto UI — the other pages in the new frame**: the frame and the Dashboard moved to the new layout, the other pages still use the old panels (Scarico, Serie TV and Film, Configurazione, Salute, Log). Gate: one page at a time, starting from Scarico, with the same tiles, rows with a poster thumbnail and summary figures at the top.
 - **Gextto UI — status colours and progress bars**: `--ok` still equals `--accent` in all four themes and three different progress bar grammars remain between Gextto and the daemon. Gate: an accessibility check of the new hues in every theme before separating the success colour from the selection colour.
 - **Gextto UI — accessibility beyond the automatic guards**: sorted headers, row checkboxes, placeholder posters and the detail tabs are labelled correctly, but axe still skips several pages and `docs/ACCESSIBILITY.md` asks for a manual screen-reader pass. Gate: an accessibility round with axe extended to the skipped pages and a keyboard/screen-reader check of the pages the suite does not visit.
 - **Gextto UI — navigation that loses the place**: row actions and the Guided/Expert switch reload the whole page, and the settings search only changes the hash, so a refresh returns to the old section. Gate: decide how many routes to convert to in-place swaps, keeping the in-app unsaved-changes message.

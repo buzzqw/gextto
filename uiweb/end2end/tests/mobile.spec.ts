@@ -334,7 +334,9 @@ test.describe("telefono", () => {
       return result;
     });
     expect(geometry.clipped).toBeLessThanOrEqual(1);
-    expect(geometry.lines).toBeGreaterThanOrEqual(3);
+    // It wraps instead of stopping on one line; how many lines depends on the
+    // width of the font (Geist needs two at this width).
+    expect(geometry.lines).toBeGreaterThanOrEqual(2);
   });
 
   // A warning of the health page is a whole error line: on a phone it wraps

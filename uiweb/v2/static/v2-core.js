@@ -181,7 +181,7 @@
         return;
       }
     }
-    fillEditor(storedColors() || { bg: "#0b1120", surface: "#131c2e", text: "#e9f0fb", accent: "#4fd6a1" });
+    fillEditor(storedColors() || { bg: "#0b0c0f", surface: "#131419", text: "#eef0f4", accent: "#3ddc97" });
   }
   document.addEventListener("change", function (event) {
     var target = event.target;
@@ -250,16 +250,19 @@
   setScale(readScale());
 
   // ---------------------------------------------------------- font family --
+  // Geist ships with Gextto (static/geist-*.woff2) and is the default; the
+  // others are the fonts the browser already has.
   var presets = {
+    geist: '"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif',
     system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif',
     sans: "sans-serif",
     serif: "serif",
     mono: "monospace"
   };
   function readFamily() {
-    var value = storageGet("gextto_font_family") || "system";
+    var value = storageGet("gextto_font_family") || "geist";
     if (presets[value] || value.indexOf("local:") === 0) return value;
-    return "system";
+    return "geist";
   }
   function fontFamilyCSS(value) {
     if (presets[value]) return presets[value];
@@ -267,10 +270,10 @@
       var name = value.slice(6).slice(0, 160).replace(/[\\"]/g, "").replace(/[\r\n]/g, " ");
       return '"' + name + '", system-ui, sans-serif';
     }
-    return presets.system;
+    return presets.geist;
   }
   function setFamily(value, persist) {
-    if (!presets[value] && value.indexOf("local:") !== 0) value = "system";
+    if (!presets[value] && value.indexOf("local:") !== 0) value = "geist";
     doc.style.setProperty("--ui-font-family", fontFamilyCSS(value));
     if (persist !== false) storageSet("gextto_font_family", value);
   }
@@ -2056,6 +2059,7 @@
       node.textContent = label;
       select.appendChild(node);
     }
+    option("geist", t("Geist (predefinito)"));
     option("system", t("Sistema"));
     option("sans", "Sans-serif");
     option("serif", "Serif");
@@ -2390,6 +2394,32 @@
       hint.hidden = true;
     });
   }
+  // The clock in the top bar: the server writes its time once (epoch and time
+  // zone offset) and the page moves it on every 5 s, hours and minutes only.
+  // No request is spent on it.
+  function initClock() {
+    var clock = document.querySelector("[data-v2-clock]");
+    if (!clock) return;
+    var epoch = parseInt(clock.getAttribute("data-epoch") || "0", 10);
+    var offset = parseInt(clock.getAttribute("data-tz-offset") || "0", 10);
+    if (!isFinite(epoch) || epoch <= 0) return;
+    var skew = epoch - Date.now();
+    var lang = doc.getAttribute("lang") || "it";
+    var dateFormat = null;
+    try { dateFormat = new Intl.DateTimeFormat(lang, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); } catch (error) { dateFormat = null; }
+    function pad(value) { return value < 10 ? "0" + value : String(value); }
+    function tick() {
+      var shifted = new Date(Date.now() + skew + offset * 60000);
+      var time = clock.querySelector("strong");
+      var date = clock.querySelector("small");
+      if (time) time.textContent = pad(shifted.getUTCHours()) + ":" + pad(shifted.getUTCMinutes());
+      if (date && dateFormat) date.textContent = dateFormat.format(shifted);
+    }
+    tick();
+    window.setInterval(tick, 5000);
+  }
+  initClock();
+
   function initLiveMetrics() {
     if (!window.EventSource) return;
     var stream = null;
@@ -2398,7 +2428,8 @@
     // everywhere.
     function wantedParts() {
       var wanted = [["top", "v2-live-top-metrics"], ["mobile", "v2-live-mobile-metrics"],
-        ["status", "v2-live-status"], ["traffic", "v2-live-traffic"]];
+        ["status", "v2-live-status"], ["traffic", "v2-live-traffic"], ["side", "v2-live-side"],
+        ["dash", "v2-dash-stats"]];
       var parts = [];
       for (var i = 0; i < wanted.length; i++) {
         if (document.getElementById(wanted[i][1])) parts.push(wanted[i][0]);
@@ -2421,6 +2452,15 @@
       });
       stream.addEventListener("chrome-status", function (e) {
         var el = document.getElementById("v2-live-status");
+        if (el) el.outerHTML = e.data;
+      });
+      stream.addEventListener("chrome-side", function (e) {
+        var el = document.getElementById("v2-live-side");
+        if (el) el.outerHTML = e.data;
+      });
+      stream.addEventListener("chrome-dash", function (e) {
+        // The Dashboard strip of load, network, torrents, space and archive.
+        var el = document.getElementById("v2-dash-stats");
         if (el) el.outerHTML = e.data;
       });
       stream.addEventListener("chrome-traffic", function (e) {

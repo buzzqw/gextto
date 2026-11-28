@@ -4,78 +4,81 @@
    light and cream via <html data-theme="light|cream">. */
 
 :root {
-  --bg: #0b1120;
-  --glow: #15324a;
-  --surface: #131c2e;
-  --surface-2: #0f1728;
-  --surface-3: #1a2740;
-  --line: #24344f;
-  --line-soft: #1b2940;
-  --text: #e9f0fb;
-  --muted: #93a4c3;
-  --accent: #4fd6a1;
-  --accent-2: #6cb8ff;
+  --bg: #0b0c0f;
+  --glow: #101219;
+  --surface: #131419;
+  --surface-2: #0f1014;
+  --surface-3: #1c1e25;
+  --line: #272a33;
+  --line-soft: #1c1e24;
+  --text: #eef0f4;
+  --muted: #a0a5b1;
+  --accent: #3ddc97;
+  --accent-2: #7aa7ff;
   /* The two curves of the dashboard traffic chart need two hues that stay
      distinct in every theme, so they do not follow --accent-2 (which the
      custom theme derives from --accent). */
-  --chart-down: #6cb8ff;
-  --chart-up: #4fd6a1;
-  --ok: #4fd6a1;
-  --warn: #f2c14e;
-  --err: #ff7b93;
-  --accent-action: #4fd6a1;
-  --btn: #1c2b45;
-  --btn-text: #dbe7fb;
-  --btn-line: #2b3f61;
-  --shadow: 0 12px 34px rgba(2, 8, 23, 0.45);
-  --radius: 12px;
-  --radius-sm: 8px;
-  --topbar: rgba(11, 17, 32, 0.86);
+  --chart-down: #7aa7ff;
+  --chart-up: #3ddc97;
+  --ok: #3ddc97;
+  --warn: #ffb35c;
+  --err: #ff6b81;
+  --accent-action: #3ddc97;
+  --btn: #1a1c22;
+  --btn-text: #e3e6ec;
+  --btn-line: #2a2d36;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 18px 36px -22px rgba(0, 0, 0, 0.8);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --topbar: rgba(11, 12, 15, 0.86);
   /* Ink that sits on the accent fill: the accent is a bright green, so the
      text on it is dark; the light and cream themes use white where their
      darker accent needs it. */
-  --on-accent: #04121f;
+  --on-accent: #04140c;
   --on-accent-strong: #fff;
+  /* eD2k traffic and downloads get their own hue in charts and bars. */
+  --ed2k: #c49bff;
   /* The translucent backdrop of a modal, and the ink of a chip that floats on
      artwork: neither follows the surface tokens. */
   --overlay-backdrop: color-mix(in srgb, #000 62%, transparent);
   --ink-on-artwork: #f3f7ff;
   /* The palettes the "automatic" theme card previews: fixed, so the card shows
      dark and light whatever theme the page is wearing. */
-  --preview-dark-bg: #0b1120;
-  --preview-dark-text: #e9f0fb;
-  --preview-light-bg: #d6e0ea;
-  --preview-light-text: #2a3444;
+  --preview-dark-bg: #0b0c0f;
+  --preview-dark-text: #eef0f4;
+  --preview-light-bg: #eceef2;
+  --preview-light-text: #161922;
   color-scheme: dark;
 }
 
 [data-theme="light"] {
   /* Soft pastel palette: avoids the pure-white glare of the previous theme
      while keeping enough contrast for readable text. */
-  --bg: #d6e0ea;
-  --glow: #cbdcec;
-  --surface: #edf1f7;
-  --surface-2: #e2e9f2;
-  --surface-3: #d5dfeb;
-  --line: #bccbdd;
-  --line-soft: #cfd9e6;
-  --text: #2a3444;
-  --muted: #4a566e; /* 5.5:1 on --bg, 6.5:1 on --surface (AA everywhere) */
+  --bg: #eceef2;
+  --glow: #e6e9ee;
+  --surface: #ffffff;
+  --surface-2: #f5f6f8;
+  --surface-3: #e8eaef;
+  --line: #d3d7df;
+  --line-soft: #e2e5ea;
+  --text: #161922;
+  --muted: #535a68; /* 5.5:1 on --bg, 6.5:1 on --surface (AA everywhere) */
   /* Text/status variants are dark enough for normal text on light surfaces.
      --accent-action remains brighter because it is used as a button fill. */
   --accent: #08704f;
-  --accent-2: #125ea8;
-  --chart-down: #125ea8;
+  --accent-2: #2c62d6;
+  --chart-down: #2c62d6;
   --chart-up: #08704f;
   --ok: #08704f;
   --warn: #8a5a00;
   --err: #b4235a;
   --accent-action: #12a97a;
-  --btn: #dfe7f2;
-  --btn-text: #26324a;
-  --btn-line: #bac8dc;
-  --shadow: 0 12px 30px rgba(31, 45, 71, 0.10);
-  --topbar: rgba(237, 241, 247, 0.92);
+  --btn: #f5f6f8;
+  --btn-text: #1f2430;
+  --btn-line: #d0d5de;
+  --shadow: 0 1px 2px rgba(20, 24, 34, 0.05), 0 16px 36px -22px rgba(20, 24, 34, 0.35);
+  --topbar: rgba(236, 238, 242, 0.9);
+  --ed2k: #7a45d6;
   color-scheme: light;
 }
 
@@ -107,6 +110,7 @@
   --btn-line: #d8c7a6;
   --shadow: 0 12px 30px rgba(90, 72, 45, 0.12);
   --topbar: rgba(251, 246, 234, 0.92);
+  --ed2k: #6b3fa0;
   color-scheme: light;
 }
 
@@ -144,7 +148,9 @@
 /* A four-colour theme with a light background (data-tone, set by the client
    from the background luminance): darker status colours and a lighter shadow
    keep warnings and errors readable on it. */
+[data-theme="custom"] { --ed2k: #b28cff; }
 [data-theme="custom"][data-tone="light"] {
+  --ed2k: #7a45d6;
   --warn: #8a5a00;
   --err: #b4235a;
   --chart-down: #125ea8;
@@ -173,7 +179,7 @@ html, body {
 body {
   background: radial-gradient(1000px 520px at 82% -12%, var(--glow) 0, transparent 62%), var(--bg);
   color: var(--text);
-  font-family: var(--ui-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif);
+  font-family: var(--ui-font-family, "Geist", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif);
   font-size: 1rem;
   line-height: 1.45;
   -webkit-text-size-adjust: 100%;

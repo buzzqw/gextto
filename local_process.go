@@ -245,6 +245,17 @@ func localProcessTicks(pid int) uint64 {
 
 // localProcessLoadLabel renders "CPU% · RAM" for a header badge. The CPU part
 // is a dash until a second sample makes the percentage meaningful.
+// localProcessLoadParts is the same figure split in CPU label, RAM label and
+// CPU percent (0 when not sampled yet).
+func localProcessLoadParts(usage localProcessUsage) (string, string, float64) {
+	cpu, percent := "—", 0.0
+	if usage.CPUPercent != nil {
+		cpu = strconv.FormatFloat(*usage.CPUPercent, 'f', 1, 64) + "%"
+		percent = *usage.CPUPercent
+	}
+	return cpu, logging.HumanBytesI64(saturatingInt64(usage.RSSBytes)), percent
+}
+
 func localProcessLoadLabel(usage localProcessUsage) string {
 	cpu := "—"
 	if usage.CPUPercent != nil {

@@ -95,7 +95,7 @@ manutenzione, salute, la pagina di gx-torrent e le altre lingue — sono nella
 | ![Menu Banda](docs/screenshots/it/bandwidth.png) | ![Dettagli del torrent, mappa dei pezzi](docs/screenshots/it/detail.png) |
 | **Banda.** Cosa vale adesso e da dove viene; un'eccezione per adesso, Auto o un limite, con un clic. | **Dettagli del torrent.** Generale, tracker, contenuto, peer, la mappa dei pezzi, limiti e storage. |
 | ![Dashboard](docs/screenshots/it/dashboard.png) | ![La regola della velocità in Configurazione](docs/screenshots/it/speed-rule.png) |
-| **Dashboard.** La sessione a colpo d'occhio, il traffico in tempo reale e cosa va controllato. | **Configurazione.** Una sola scelta per la regola della velocità; le righe che ne dipendono compaiono solo quando servono. |
+| **Dashboard.** Carico, rete e spazio in una fascia di numeri in diretta, cosa sta scaricando ora con la locandina, il traffico, la salute, le uscite della settimana e cosa va controllato. | **Configurazione.** Una sola scelta per la regola della velocità; le righe che ne dipendono compaiono solo quando servono. |
 
 <img src="docs/screenshots/it/phone.png" alt="Scarico su un telefono" width="260" align="right">
 

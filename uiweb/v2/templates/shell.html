@@ -21,7 +21,7 @@
 <title>Gextto · {{.Title}}</title>
 <link rel="icon" href="/favicon.ico">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#0b1120">
+<meta name="theme-color" content="#0b0c0f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -101,30 +101,36 @@
     {{if .Docs}}<nav class="nav-docs" aria-label="{{tr "Documentazione"}}">
       {{range .Docs}}<a class="nav-item nav-doc{{if .Active}} active{{end}}" href="{{.Href}}"{{if .External}} target="_blank" rel="noopener noreferrer"{{end}}{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span>{{tr .Label}}</span></a>{{end}}
     </nav>{{end}}
-    <div class="sidebar-foot"><span class="pulse"></span><span {{trTitle "Gextto è attivo: il servizio sta lavorando (scarica, importa, cerca). Non è lo stato di salute: quello è il badge «ok» in alto."}}>{{if .Chrome.DryRun}}{{tr "dry-run"}}{{else}}{{tr "attivo"}}{{end}}</span></div>
+    {{/* The foot of the sidebar is a small live panel: the current speeds and
+         a bar chart of the last half hour, under the documentation links. It
+         is refreshed by the same SSE stream as the top bar. */}}
+    <div class="sidebar-foot">{{template "v2_live_side" .Chrome}}</div>
   </aside>
   <main class="main-shell">
-    <header class="topbar v2-topbar-sticky">
+    {{/* The bar reads left to right: the service state and the live figures,
+         then the clock, Aggiorna, Aspetto and Aggiungi. The page title sits on
+         its own row underneath. On the Dashboard the figures are left out: the
+         page opens with a fuller version of them. */}}
+    <header class="topbar v2-topbar-sticky v3-topbar">
       <div class="topbar-title">
         <h1>{{tr .Title}}</h1>
+        {{if .Chrome.DryRun}}<span class="badge warn topbar-dry" {{trTitle "Modalità prova: non scarica e non importa nulla"}}>{{tr "DRY-RUN"}}</span>{{end}}
       </div>
       <div class="top-actions">
-        {{template "v2_live_top_metrics" .Chrome}}
+        {{template "v2_live_status" .Chrome}}
+        {{if ne .Page "dashboard"}}{{template "v2_live_top_metrics" .Chrome}}{{end}}
         <button class="btn add-torrent-toggle" type="button" data-add-torrent-toggle aria-label="{{tr "Aggiungi torrent"}}" {{trTitle "Apri o chiudi il modulo per aggiungere un torrent"}}{{if eq .Page "downloads"}} aria-expanded="false" aria-controls="v2-add-torrent"{{end}}><span aria-hidden="true">{{icon "i-plus"}}</span><span class="add-torrent-toggle-label">{{tr "Aggiungi torrent"}}</span></button>
         {{/* HTMX asks for this page again and replaces only its content: the
              screen does not go blank, the scroll and the open panels stay, and
              the live figures keep their own rhythm. Without HTMX the button
              falls back to a normal reload. */}}
         <button class="btn btn-refresh" type="button" id="v2-refresh-button" hx-get="{{.SelfURL}}" hx-target="#v2-page" hx-select="#v2-page" hx-swap="outerHTML" hx-disabled-elt="this" onclick="if(!window.htmx)window.location.reload()" {{trTitle "Rilegge lo stato dal daemon e sostituisce solo il contenuto: la posizione e i pannelli aperti restano"}} aria-label="{{tr "Ricarica i dati mostrati"}}"><span class="btn-refresh-icon" aria-hidden="true">{{icon "i-reload"}}</span><span class="btn-refresh-label">{{tr "Aggiorna"}}</span></button>
-        {{template "v2_live_status" .Chrome}}
       </div>
       <div class="top-controls">
-        {{with .Dashboard}}
-        <div class="top-kpis">
-          <div class="top-kpi"><span class="top-kpi-label">{{tr "Spazio libero"}}</span><strong>{{bytesU .FreeSpace}}</strong></div>
-          <div class="top-kpi"><span class="top-kpi-label">{{tr "Magnet in archivio"}}</span><strong>{{tr .ArchiveTotal}}</strong><small class="muted">{{tr .SeenGroups}}</small></div>
-        </div>
-        {{end}}
+        {{/* The clock is kept by the browser: the server writes the time once,
+             with its time zone, and the page moves it on by itself, so no
+             request is spent on it. */}}
+        <time class="current-time" data-v2-clock data-epoch="{{.Chrome.ClockEpoch}}" data-tz-offset="{{.Chrome.ClockOffset}}" datetime="{{.Chrome.CurrentTime}}" aria-label="{{tr "Ora attuale"}}" {{trTitle "Ora del server, tenuta aggiornata dal browser"}}><strong>{{tr .Chrome.CurrentTime}}</strong><small>{{tr .Chrome.CurrentDate}}</small></time>
         <details class="v2-menu appearance-menu" data-v2-menu>
           <summary class="btn appearance-toggle" {{trTitle "Tema, dimensione del testo, carattere e lingua: le scelte valgono per questo browser"}}>
             <span class="appearance-glyph" aria-hidden="true">{{tr "Aa"}}</span><span>{{tr "Aspetto"}}</span><span class="appearance-caret" aria-hidden="true">▾</span>
@@ -150,6 +156,7 @@
             </form>
           </div>
         </details>
+      </div>
     </header>
     <section class="mobile-performance" aria-label="{{tr "Connessioni e prestazioni"}}">
       <div class="mobile-performance-head"><span class="eyebrow">{{tr "Connessioni e prestazioni"}}</span><small class="muted">{{tr "Aggiornamento automatico"}}</small></div>
@@ -230,17 +237,27 @@
      page. The next cycle is on the Dashboard ("Prossima esecuzione"). */}}
 <div id="v2-live-top-metrics" class="top-live-metrics" data-active-downloads="{{.ActiveDownloads}}">
   <div class="top-metric top-metric-process" {{if .GxLoad}}{{trTitle "CPU e RAM di Gextto e di gx-torrent"}}{{else}}{{trTitle "CPU e RAM del processo Gextto"}}{{end}}><span class="top-metric-label"><span>{{tr "Gextto"}}</span>{{if .GxLoad}}<span class="top-metric-more"> · {{tr "gx-torrent"}}</span>{{end}}{{if .CPUFrequency}} <small class="metric-frequency">{{tr .CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}} · {{.RAM}}{{if .GxLoad}} <span class="top-metric-more">{{tr .GxLoad}}</span>{{end}}</strong></div>
-  {{if .AmuleLoad}}<div class="top-metric" {{trTitle "CPU e RAM del processo amuled su questa macchina"}}><span class="top-metric-label">{{ed2kTr "aMule"}}</span><strong>{{tr .AmuleLoad}}</strong></div>{{end}}
+  {{if .AmuleLoad}}<div class="top-metric top-metric-amule" {{trTitle "CPU e RAM del processo amuled su questa macchina"}}><span class="top-metric-label">{{ed2kTr "aMule"}}</span><strong>{{tr .AmuleLoad}}</strong></div>{{end}}
   <div class="top-metric top-metric-rate" {{trTitle "Velocità di download e di upload"}}><span class="top-metric-label">{{tr "↓ ↑"}}</span><strong>{{tr .Download}} · {{tr .Upload}}{{if gt .LatencyMs 0}} <span class="top-metric-ping" {{trTitle "Ping misurato da Auto verso Google/Cloudflare; se sale, Auto riduce la velocità"}}>{{icon "i-signal"}} {{.LatencyMs}} ms</span>{{end}}</strong></div>
-  <div class="top-metric" {{trTitle "Torrent nella sessione"}}><span class="top-metric-label">{{tr "Torrent"}}</span><strong>{{tr .Torrents}}</strong></div>
-  <div class="top-metric" {{trTitle "Peer connessi / Seed"}}><span class="top-metric-label">{{tr "P/S"}}</span><strong>{{.Peers}}/{{.Seeds}}</strong></div>
+  <div class="top-metric top-metric-torrents" {{trTitle "Torrent nella sessione"}}><span class="top-metric-label">{{tr "Torrent"}}</span><strong>{{tr .Torrents}}</strong></div>
+  <div class="top-metric top-metric-peers" {{trTitle "Peer connessi / Seed"}}><span class="top-metric-label">{{tr "P/S"}}</span><strong>{{.Peers}}/{{.Seeds}}</strong></div>
+</div>
+{{end}}
+
+{{define "v2_live_side"}}
+<div id="v2-live-side" class="live-side" aria-label="{{tr "Traffico in questo momento"}}">
+  <div class="live-side-rates">
+    <span class="live-side-down" {{ed2kTitle "Velocità di download totale: torrent e aMule"}}><span aria-hidden="true">↓</span> <strong>{{tr .Download}}</strong></span>
+    <span class="live-side-up" {{ed2kTitle "Velocità di upload totale: torrent e aMule"}}><span aria-hidden="true">↑</span> <strong>{{tr .Upload}}</strong></span>
+  </div>
+  {{if .SideBars}}<div class="live-side-bars" role="img" aria-label="{{tr "Velocità di download negli ultimi 30 minuti"}}" {{trTitle "Velocità di download negli ultimi 30 minuti: ogni barra è un minuto e mezzo"}}>{{range .SideBars}}<i style="--h:{{.}}%"></i>{{end}}</div>{{end}}
+  <div class="live-side-foot"><span class="pulse"></span><span {{trTitle "Gextto è attivo: il servizio sta lavorando (scarica, importa, cerca). Non è lo stato di salute: quello è il badge «ok» in alto."}}>{{if .DryRun}}{{tr "dry-run"}}{{else}}{{tr "attivo"}}{{end}}</span></div>
 </div>
 {{end}}
 
 {{define "v2_live_status"}}
 <div id="v2-live-status" class="top-live-status">
   <span class="system-pill {{if eq .Status "ok"}}ok{{else if eq .Status "degraded"}}warn{{else}}err{{end}}" {{if eq .Status "ok"}}{{trTitle "Stato del servizio: ok, Gextto risponde e il ciclo è regolare"}}{{else if eq .Status "degraded"}}{{trTitle "Stato del servizio: degraded, Gextto risponde ma qualcosa non va (cartelle, motore o disco)"}}{{else}}{{trTitle "Stato del servizio: offline, Gextto non risponde"}}{{end}}><span class="pulse"></span>{{tr .Status}}</span>
-  <time class="current-time" datetime="{{.CurrentTime}}" aria-label="{{tr "Ora attuale"}}" {{trTitle "Ora attuale"}}>{{tr .CurrentTime}}</time>
 </div>
 {{end}}
 

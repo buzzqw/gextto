@@ -222,6 +222,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /dashboard/search", V2DashboardSearch)
 	v2Handle(s, mux, "GET /dashboard/feed", V2DashboardFeed)
 	v2Handle(s, mux, "GET /dashboard/problems", V2DashboardProblems)
+	v2Handle(s, mux, "GET /dashboard/now", V2DashboardNowPartial)
+	v2Handle(s, mux, "GET /dashboard/health", V2DashboardHealthPartial)
 	v2Handle(s, mux, "POST /dashboard/problems/ack", V2DashboardProblemsAck)
 	v2Handle(s, mux, "POST /dashboard/feed/add", V2DashboardFeedAdd)
 
@@ -592,7 +594,14 @@ func changelogOnlineHref(s *AppState) string {
 // download history), which the classic UI loaded with JavaScript.
 type v2DashboardView struct {
 	uiDashboardData
-	Calendar    []v2DashboardCalendarItem
+	Calendar []v2DashboardCalendarItem
+	// Stats is the strip of live figures at the top, Now the frame of what is
+	// downloading, Health the summary of the Salute page and Week the next
+	// seven days of releases.
+	Stats       v2DashStats
+	Now         v2DashNowView
+	Health      v2DashHealthView
+	Week        v2DashWeek
 	PanelTables []v2TableData
 	Jobs        *v2JobsView
 	Search      v2SearchView
@@ -643,7 +652,7 @@ func v2DashboardCalendarFrom(s *AppState) []v2DashboardCalendarItem {
 			TmdbURL: tmdb,
 			TvdbURL: tvdb,
 		})
-		if len(out) >= 6 {
+		if len(out) >= 14 {
 			break
 		}
 	}
@@ -701,9 +710,14 @@ func v2SectionTables(s *AppState, r *http.Request, sections []uiPageSection, vie
 func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 	base := uiDashboardDataFrom(s)
 	jobs := v2JobsViewFrom(s)
+	calendar := v2DashboardCalendarFrom(s)
 	return v2DashboardView{
 		uiDashboardData: base,
-		Calendar:        v2DashboardCalendarFrom(s),
+		Calendar:        calendar,
+		Stats:           v2DashStatsFrom(s, uiShellChromeFrom(s)),
+		Now:             v2DashNowFrom(s),
+		Health:          v2DashHealthFrom(s),
+		Week:            v2DashWeekFrom(calendar, time.Now()),
 		Jobs:            &jobs,
 		Search:          v2SearchView{Redirect: "/?view=dashboard"},
 		Traffic:         v2TrafficViewFrom(s),
@@ -1055,6 +1069,10 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 		write("top", "v2_live_top_metrics", chrome)
 		write("mobile", "v2_live_mobile_metrics", chrome)
 		write("status", "v2_live_status", chrome)
+		write("side", "v2_live_side", chrome)
+		if wants("dash") {
+			write("dash", "v2_dash_stats", v2DashStatsFrom(s, chrome))
+		}
 		if wants("traffic") {
 			write("traffic", "v2_live_traffic", v2TrafficViewFrom(s))
 		}

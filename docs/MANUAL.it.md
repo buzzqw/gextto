@@ -280,36 +280,53 @@ sorgenti, un problema diventa difficile da riprodurre.
 Sul computer ogni voce ha la sua icona accanto al nome e ogni area ha il suo
 titolo in maiuscoletto: la colonna si legge a colpo d'occhio. In fondo al menu,
 sotto le aree, ci sono il **Manuale**, il **Changelog** e la **Licenza**: sono
-pagine da leggere e stanno lì come piccoli collegamenti. Se le voci non entrano
-nello schermo, scorre solo la lista delle pagine: marca, documentazione e stato
-restano fermi. Sul telefono la barra in basso non cambia, e manuale, changelog e
+pagine da leggere e stanno lì come piccoli collegamenti. Sotto ancora c'è un
+piccolo riquadro con le **velocità in diretta** di download e upload, un grafico a
+barre degli ultimi 30 minuti (ogni barra è un minuto e mezzo) e lo stato
+*attivo* o *dry-run*. Se le voci non entrano nello schermo, scorre solo la lista
+delle pagine: marca, documentazione e riquadro restano fermi. Sul telefono la barra in basso non cambia, e manuale, changelog e
 licenza sono nel menu **Altro**.
 
 ### La barra in alto
 
-- **Aggiungi torrent**, presente in ogni pagina: apre il modulo per un magnet,
-  un URL o un file `.torrent` (vedi [Aggiungere un torrent o un magnet](#aggiungere-un-torrent-o-un-magnet)).
+La barra si legge da sinistra a destra, su una riga:
+
+- lo **stato del servizio**: *ok* in verde, *degraded* in arancione quando
+  qualcosa non va (cartelle, motore o disco), *offline* in rosso;
+- le **metriche in diretta**: CPU e RAM di Gextto e di gx-torrent (con la
+  frequenza della CPU), di aMule quando è attivo e locale, le **velocità** di
+  download e upload (torrent più aMule) con la latenza misurata da Auto, i
+  torrent della sessione e i peer/seed connessi. Si aggiornano ogni 5 secondi e
+  si fermano quando la scheda del browser non è in vista. Se lo schermo è
+  stretto, le meno importanti si nascondono (prima aMule, poi i valori
+  secondari) e i comandi a destra restano sempre su una riga. Nella
+  **Dashboard** non ci sono: la pagina si apre con una versione più completa
+  degli stessi numeri;
+- l'**ora del server** con il giorno: il server la scrive una volta, poi la
+  pagina la tiene aggiornata da sola, senza altre richieste;
 - **Aggiorna**: richiede di nuovo la pagina e ne sostituisce soltanto il
   contenuto. Lo schermo non lampeggia, la posizione di scorrimento e i pannelli
   aperti restano dove sono; i dati in diretta continuano ad aggiornarsi da soli,
-  quindi serve solo quando vuoi rileggere l'elenco.
-- Le **velocità** di download e upload (torrent più aMule) e **CPU e RAM per
-  processo**: Gextto, gx-torrent e, se attivo e locale, aMule. Si aggiornano
-  ogni 5 secondi, e si fermano quando la scheda del browser non è in vista:
-  riprendono appena torni sulla pagina.
+  quindi serve solo quando vuoi rileggere l'elenco;
 - **Aspetto**: un solo pulsante raccoglie tema, dimensione del testo,
-  carattere e lingua, invece di sei comandi sparsi in cima a ogni pagina. Il
-  menu mostra i quattro temi pronti (Automatico, Scuro, Chiaro, Crema): il tema
-  **Automatico** segue il chiaro o lo scuro del sistema e cambia quando lo cambi
-  anche tu. **Altri temi e personalizzato…** apre il dialogo completo, con Nord,
-  Dracula, Solarized, Gruvbox, Alto contrasto e gli altri, in versione chiara e
-  scura, e **Personalizza** crea un tema tuo da quattro colori (sfondo,
-  pannelli, testo, accento), con l'avviso se il contrasto è troppo basso. I temi
-  salvati sono sul server e li ritrovi da ogni dispositivo; il tema attivo, il
-  testo e il carattere restano una scelta del singolo browser.
-- La **lingua** dell'interfaccia.
-- **Dona**, in basso a destra (sul telefono è nel menu *Altro*), e
-  **Aggiornamento disponibile** quando c'è una versione nuova.
+  carattere e lingua. Il menu mostra i quattro temi pronti (Automatico, Scuro,
+  Chiaro, Crema): il tema **Automatico** segue il chiaro o lo scuro del sistema
+  e cambia quando lo cambi anche tu. **Altri temi e personalizzato…** apre il
+  dialogo completo, con Nord, Dracula, Solarized, Gruvbox, Alto contrasto e gli
+  altri, in versione chiara e scura, e **Personalizza** crea un tema tuo da
+  quattro colori (sfondo, pannelli, testo, accento), con l'avviso se il
+  contrasto è troppo basso. Il carattere predefinito è **Geist**, incluso in
+  Gextto, quindi uguale su ogni dispositivo; da **Scegli il carattere** puoi
+  tornare a quello di sistema o usarne uno installato. I temi salvati sono sul
+  server e li ritrovi da ogni dispositivo; il tema attivo, il testo e il
+  carattere restano una scelta del singolo browser;
+- **Aggiungi torrent**, presente in ogni pagina: apre il modulo per un magnet,
+  un URL o un file `.torrent` (vedi [Aggiungere un torrent o un magnet](#aggiungere-un-torrent-o-un-magnet)).
+
+Sotto, su una riga sua, c'è il **titolo della pagina**; in modalità prova gli sta
+accanto l'etichetta **DRY-RUN**. **Dona** è in basso a destra (sul telefono nel
+menu *Altro*), e **Aggiornamento disponibile** compare quando c'è una versione
+nuova.
 
 ### Dal telefono
 
@@ -1926,24 +1943,53 @@ le chiavi in [Chiavi di accesso](api-keys.it.md).
 
 È la pagina da guardare ogni giorno. Dall'alto:
 
-- **In sessione** — torrent in scarico, fermi e in seed, la banda degli ultimi
-  30 giorni e il **grafico del traffico** degli ultimi 30 minuti (download e
-  upload, con il picco e il limite in vigore; con eD2k, aMule a linee
-  tratteggiate);
+- **La fascia dei numeri**, aggiornata ogni 5 secondi:
+  - **Carico** — CPU e RAM di Gextto, di gx-torrent e, se attivo e locale, di
+    aMule, ciascuno con una barra; poi il carico medio della macchina
+    nell'ultimo minuto con la memoria in uso;
+  - **Rete** — velocità di download e upload, latenza misurata da Auto, peer
+    connessi, nodi DHT e lo stato della **porta**: *aperta sul router* quando
+    UPnP o NAT-PMP l'hanno aperta, *raggiungibile* quando arrivano connessioni da
+    fuori, *forse chiusa sul router* quando non arriva niente (DHT e porta solo
+    con gx-torrent);
+  - **Torrent** — quanti trasferiscono davvero, quanti sono fermi, quanti in
+    seed e i peer/seed connessi;
+  - **Spazio libero** — nella cartella dei download, con la barra dello spazio
+    occupato;
+  - **Magnet in archivio** — le release dell'archivio e quante ne ricorda
+    Gextto per non riprenderle;
+- **In scarico ora** — i quattro download più utili da guardare (prima quelli
+  che ricevono dati, i più veloci in testa), con la locandina della serie quando
+  Gextto la conosce, l'episodio, la barra, la velocità e il tempo che manca. Un
+  download fermo ha la barra arancione. **Apri Scarico** porta alla lista
+  completa;
+- **Traffico** — il grafico degli ultimi 30 minuti (download e upload, con il
+  picco e il limite in vigore; con eD2k, aMule a linee tratteggiate) e la banda
+  degli ultimi 30 giorni;
+- **Salute** — una riga per area, con un segno verde o arancione: feed RSS
+  attivi e release prese oggi, **indexer** (un punto per indexer, arancione se
+  Gextto l'ha messo in pausa dopo degli errori), **integrazioni** in errore,
+  **coda titoli** con la prossima valutazione, **eD2k** (ID alto o basso, Kad) e
+  **cartelle** scrivibili. In cima dice «Tutto regolare» o quante cose guardare;
+  **Apri Salute** porta al dettaglio. Si aggiorna ogni minuto;
+- **Questa settimana** — i sette giorni a partire da oggi, con gli episodi in
+  uscita delle serie che segui e la loro locandina; quello che esce più avanti è
+  elencato sotto;
 - **Da controllare** — download fermi (con motivo e prossimo tentativo),
   spostamenti in libreria in sospeso, avvisi ed errori. Un avviso resta finché il
   download è in sessione e sparisce da solo quando esce senza nulla in sospeso;
   **Pulisci** li segna come letti. Se è tutto a posto dice «Niente da
   controllare»;
-- **Ricerca manuale** e **Ricerca automatica** — la prossima esecuzione,
-  l'esito dell'ultimo ciclo e i pulsanti per avviarne uno (tutto, o solo Serie,
-  Film, Fumetti);
+- **Ricerca automatica** — l'esito dell'ultimo ciclo, la prossima esecuzione,
+  l'intervallo, gli **episodi mancanti** (il numero apre l'elenco) e i pulsanti
+  per avviare un ciclo (tutto, o solo Serie, Film, Fumetti), con **Backup** e
+  **Configurazione**;
+- **Cerca**, **Ultimi download** e **Ultimi trovati nelle sorgenti**, chiusi: si
+  aprono con un clic;
 - **Operazioni in background** — rinomine, scansioni, MediaInfo, controllo
-  integrità, ricerche dei mancanti: con la percentuale e **Annulla**;
-- **Prossime uscite**, **ultimi download**, **attività recente** e **ultimi
-  trovati**.
+  integrità, ricerche dei mancanti: con la percentuale e **Annulla**.
 
-Il badge **DRY-RUN** o **ATTIVO** in alto dice se Gextto scarica davvero.
+In modalità prova l'etichetta **DRY-RUN** sta accanto al titolo della pagina.
 
 ### Salute
 
