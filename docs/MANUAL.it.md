@@ -965,6 +965,7 @@ foglio scorre al suo interno. Le schede:
 | **Generale** | dati del torrent (del magnet si vedono le prime tre righe), copia magnet, **Esporta .torrent**, riannuncia, pin, riavvia, segna come fallito, **Super seeding**, web seed |
 | **Tracker** | aggiungi tracker (`tier\|url` per riga) o rimuovine uno; per ognuno vedi lo stato, gli errori, i seed e i peer, **quanto ci ha messo l'ultimo annuncio** a ricevere la risposta e la **mediana** degli ultimi annunci, così un tracker lento si distingue da una linea lenta; **in attesa** segnala l'annuncio che aspetta la risposta. In cima, quanti annunci sono in corso e la mediana fra i tracker |
 | **Contenuto** | i file, con la **priorità** (Salta, Normale, Alta, Massima) e, con gx-torrent, **▶** per lo streaming |
+| **Sottotitoli** | quando il provider è attivo, scegli il file video, filtra per lingua e cerca i sottotitoli disponibili; mostra corrispondenza, reputazione e punteggio, anche mentre il file è in download |
 | **Peers** | i peer connessi; con gx-torrent accanto all'indirizzo c'è il **paese** del peer, dal database DB-IP che gx-torrent scarica da solo |
 | **Pezzi** | la mappa dei pezzi: verde scaricato, giallo in corso, grigio mancante. Con gx-torrent sotto c'è la **disponibilità tra i peer**: più la barra è piena, più peer connessi hanno i pezzi che ti mancano; il rosso indica pezzi che nessun peer connesso ha. Con qBittorrent c'è la sola mappa, e i pezzi dei file saltati risultano mancanti |
 | **Velocità** | il grafico di download e upload di quel torrent negli ultimi 30 minuti, con media e picco. Gextto registra la velocità solo dei torrent che stanno trasferendo, quindi il grafico c'è già quando apri la scheda |
@@ -1787,6 +1788,20 @@ e quei risultati restano nell'anteprima manuale. Un sottotitolo già presente,
 nella lingua e con le varianti forced/SDH che hai chiesto, non viene mai toccato
 e un titolo senza risultati viene lasciato in pace per un po' prima di riprovare. Se indichi più lingue,
 per esempio `ita,eng`, ne cerca una per ciascuna.
+
+Anche se non hai chiesto sottotitoli per il titolo, nel dettaglio di un torrent
+compare la scheda **Sottotitoli** quando il provider è attivo. Scegli il **file
+video** — per un pack, la singola puntata — e la **lingua sottotitolo**; **Tutte
+le lingue** mostra l'elenco completo, oppure puoi filtrare per una lingua. La
+ricerca parte solo quando premi **Cerca sottotitoli** e non scrive file. Per un
+film o una puntata riconosciuti dai metadati o dal nome del torrent/file, l'elenco
+mostra la somiglianza del nome release, le corrispondenze di hash, dimensione e
+ID esterno, i badge trusted/AI e il numero di download. Il **punteggio** unisce
+questi segnali e indica un **Consigliato per lingua**; non è una misura della
+qualità tecnica del sottotitolo. Se il file non è ancora completo, la ricerca usa
+identità e somiglianza dei nomi, senza presentare come definitivi hash o
+dimensione finali. Un file che contiene più episodi viene rifiutato finché non
+scegli una puntata univoca.
 
 Su una puntata archiviata o un film scaricato, **Cerca sottotitoli** apre
 un'anteprima con lingua, release, motivo della corrispondenza e nome del file

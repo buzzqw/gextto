@@ -37,3 +37,41 @@
   </div>
 </div>
 {{end}}
+
+{{define "v2_torrent_subtitles_form"}}
+<form class="form-grid" method="post" action="/subtitles/search" hx-post="/subtitles/search" hx-target="#v2-detail-subtitle-results" hx-swap="innerHTML" hx-disabled-elt="find button">
+  <input type="hidden" name="torrent_hash" value="{{.Hash}}" />
+  <label class="field span-full"><span>{{tr "File video"}}</span><select class="input" name="file_index" required aria-label="{{tr "File video"}}" {{trTitle "Sceglie il video del torrent a cui riferire la ricerca; per un pack seleziona la puntata."}}>
+    {{range .Files}}<option value="{{.Index}}"{{if eq $.FileIndex .Index}} selected{{end}}>{{tr .Path}} — {{bytes .Size}} — {{if .Ready}}{{tr "completo"}}{{else}}{{tr "incompleto"}}{{end}}</option>{{end}}
+  </select></label>
+  <label class="field span-full"><span>{{tr "Lingua sottotitolo"}}</span><select class="input" name="languages" aria-label="{{tr "Lingua sottotitolo"}}" {{trTitle "Filtra i risultati per una lingua; Tutte le lingue mostra l'elenco completo."}}>
+    {{range .LanguageOptions}}<option value="{{.Code}}"{{if eq $.Languages .Code}} selected{{end}}>{{tr .Label}}</option>{{end}}
+  </select></label>
+  <div class="form-actions span-full"><button class="btn sm primary" type="submit" {{trTitle "Interroga il provider per il video selezionato senza scaricare sottotitoli."}}>{{tr "Cerca sottotitoli"}}</button></div>
+</form>
+<p class="hint">{{tr "La ricerca interroga il provider senza scaricare file."}}</p>
+{{end}}
+
+{{define "v2_torrent_subtitles_results"}}
+{{if .Error}}<div class="notice err" role="alert">{{tr .Message}}</div>{{else}}
+<div aria-live="polite">
+  {{if .Target.Label}}<p class="hint"><strong>{{tr "Sottotitoli per"}}:</strong> {{tr .Target.Label}}</p>{{end}}
+  {{if not .Target.FileComplete}}<p class="hint">{{tr "Il file non è ancora completo: la corrispondenza usa identità e somiglianza dei nomi, non hash o dimensione finali."}}</p>{{end}}
+  {{if .Candidates}}
+  <div class="table-wrap"><table class="data-table">
+    <caption class="sr-only">{{tr "Sottotitoli trovati"}}</caption>
+    <thead><tr><th scope="col">{{tr "Lingua"}}</th><th scope="col">{{tr "Release"}}</th><th scope="col">{{tr "Corrispondenza"}}</th><th scope="col" {{trTitle "Punteggio che unisce corrispondenza del video e reputazione del sottotitolo; non misura la qualità tecnica del contenuto."}}>{{tr "Punteggio"}}</th><th scope="col">{{tr "Reputazione"}}</th></tr></thead>
+    <tbody>{{range .Candidates}}<tr>
+      <td>{{tr .LanguageLabel}}{{if .IsForced}} <span class="badge">{{tr "Forced"}}</span>{{end}}{{if .IsSDH}} <span class="badge">{{tr "SDH"}}</span>{{end}}</td>
+      <td class="truncate" {{trTitle .Release}}>{{tr .Release}}</td>
+      <td><strong>{{.ReleaseSimilarity}}%</strong> {{if .HashMatch}}<span class="badge ok">{{tr "Hash file esatto"}}</span>{{end}}{{if .SizeMatch}} <span class="badge">{{tr "Dimensione esatta"}}</span>{{end}}{{if .ExternalIDMatch}} <span class="badge">{{tr "ID esterno"}}</span>{{end}}</td>
+      <td><strong>{{.Score}}/100</strong>{{if .Recommended}} <span class="badge ok">{{tr "Consigliato"}}</span>{{end}}</td>
+      <td>{{if .IsTrusted}}<span class="badge ok">{{tr "Trusted"}}</span>{{end}}{{if .IsAITranslated}} <span class="badge warn">{{tr "Tradotto con AI"}}</span>{{end}}{{if .IsMachineTranslated}} <span class="badge warn">{{tr "Traduzione automatica"}}</span>{{end}}<br /><small class="muted">{{tr "Download"}}: {{.DownloadCount}}</small></td>
+    </tr>{{end}}</tbody>
+  </table></div>
+  {{else}}<p class="muted">{{tr "Nessun sottotitolo trovato con questi filtri."}}</p>{{end}}
+  <p class="hint">{{tr "Il punteggio unisce corrispondenza e reputazione; non misura la qualità tecnica del sottotitolo."}}</p>
+  <p class="hint">{{tr "L'anteprima non scarica file. Quando il video è archiviato puoi applicare un sottotitolo dalla relativa scheda."}}</p>
+</div>
+{{end}}
+{{end}}

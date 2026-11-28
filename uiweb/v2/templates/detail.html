@@ -53,6 +53,18 @@
    {{if .Caps.FileNote}}<p class="hint">{{tr .Caps.FileNote}}</p>{{end}}
    {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">{{tr "File"}}</th><th scope="col">{{tr "Dimensione"}}</th><th scope="col">{{tr "Scaricato"}}</th><th scope="col" {{trTitle "Priorità di download del file: Salta non lo scarica, Alta e Massima lo scaricano prima degli altri."}}>{{tr "Priorità"}}</th><th scope="col" {{trTitle "Avvia lo streaming del file: i pezzi della finestra vengono scaricati per primi."}}>{{tr "Riproduci"}}</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" {{trTitle $file.Path}}>{{tr $file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="{{tr "Priorità di %s" $file.Path}}" {{trTitle "Cambia la priorità di %s; il salvataggio avviene subito" $file.Path}}><option value="0"{{if eq $file.Priority 0}} selected{{end}}>{{tr "Salta"}}</option>{{if $.Caps.FileLevels}}<option value="1"{{if eq $file.Priority 1}} selected{{end}}>{{tr "Normale"}}</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>{{tr "Predefinita"}}</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>{{tr "Alta"}}</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>{{tr "Massima"}}</option>{{else}}<option value="4"{{if ne $file.Priority 0}} selected{{end}}>{{tr "Scarica"}}</option>{{end}}</select></form></td>{{if eq $.Caps.Backend "gx-torrent"}}<td><a class="btn sm" href="/api/torrents/{{$.Hash}}/stream?file={{$index}}" target="_blank" rel="noopener" {{trTitle "Riproduci questo file in streaming; i pezzi della finestra vengono scaricati per primi"}}>▶</a></td>{{end}}</tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">{{tr "Nessun file."}}</p>{{end}}
+{{else if eq .Tab "subtitles"}}
+  {{if not .Subtitles.Enabled}}
+    <p class="notice err" role="alert">{{tr "Sottotitoli disabilitati"}}. <a href="/?view=integrations">{{tr "Abilita i sottotitoli in Integrazioni."}}</a></p>
+  {{else}}
+    {{if .TabError}}<p class="alert" role="alert">{{tr .TabError}}</p>{{end}}
+    {{if .Subtitles.Files}}
+      {{template "v2_torrent_subtitles_form" .Subtitles}}
+      <div id="v2-detail-subtitle-results" aria-live="polite"></div>
+    {{else}}
+      <p class="muted">{{tr "Nessun file video in questo torrent"}}</p>
+    {{end}}
+  {{end}}
 {{else if eq .Tab "peers"}}
   {{if .TabError}}<p class="alert">{{tr .TabError}}</p>{{end}}
   {{if .Peers}}<div class="table-wrap"><table class="data-table" data-v2-peers-table><thead><tr>

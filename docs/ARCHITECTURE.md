@@ -209,6 +209,7 @@ qBittorrent-nox.
 | `web_qbit.go` | the qBittorrent Web API subset (`/api/v2`) the browser extensions speak: login with the `SID` cookie, add of magnets and `.torrent` files, list, pause/resume, delete and recheck, all forwarded to the active engine. |
 | `library_bulk.go` | *Edit selected* of the Series and Movies tables: the same values on many titles, with a quality profile as a template. |
 | `web_torrent_events.go` | event machine of the torrent lifecycle. |
+| `subtitles.go`, `subtitles_torrent.go`, `web_subtitles.go`, `internal/subtitles/` | external subtitle targets, active-torrent file resolution, provider client, matching/reputation score and the search/apply HTTP surface. |
 | `web_background.go` | long-running background workers. |
 | `web_workers_media.go` | media workers: scheduled backup, MediaInfo backfill, calendar. |
 | `web_maintenance_rename.go` | folder rename with user review. |
@@ -237,6 +238,7 @@ qBittorrent-nox.
 | `uiweb_shell.go` | UI "chrome": top bar, sidebar, status. The clock is sent once (epoch and time zone offset) and kept by the browser. The Geist fonts (`uiweb/v2/static/geist-*.woff2`, SIL OFL in `geist-OFL.txt`) are served from the binary. |
 | `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | Configuration page: areas, sections and index with the panel (`Group`) of each setting; units, special values, control type and the toggle it depends on; defaults; descriptions. |
 | `uiweb_v2.go` | v2 shell (HTMX), fragment routing and rendering. |
+| `uiweb_v2_subtitles.go` | subtitle settings/provider checks, the archived-title modal and the active-torrent subtitle tab with file/language selection and scored results. |
 | `uiweb_v2_tr.go` | render-time translation: one parsed template set per language with `tr`/`trTitle` bound to its dictionary, and `v2TranslateFragment` for markup Go assembles. |
 | `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go`, `uiweb_v2_archive_sql.go` | dedicated v2 pages. |
 | `uiweb_v2_gaps.go`, `uiweb_v2_import.go`, `uiweb_v2_library_layout.go`, `uiweb_v2_ports.go` | *Missing* tab grouped by series and season, manual-import page, poster view of the library, peer-port panel. |

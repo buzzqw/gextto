@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 func subtitleTestVideo(t *testing.T) string {
@@ -178,7 +180,7 @@ func TestV2SubtitleSettingsUseSelectAndVisibleHelp(t *testing.T) {
 	if !strings.Contains(page, `<select class="input" name="enabled">`) {
 		t.Fatalf("enabled is not a select")
 	}
-	if !strings.Contains(page, `Mostra il pulsante di ricerca sulle schede di episodi e film.`) {
+	if !strings.Contains(page, `Mostra la ricerca dei sottotitoli su episodi, film e dettagli dei torrent.`) {
 		t.Fatalf("field help is not visible")
 	}
 	code, _ = v2Request(t, server, http.MethodPost, "/section/form", url.Values{
@@ -256,5 +258,257 @@ func TestV2SubtitleActionAppearsForArchivedEpisode(t *testing.T) {
 	code, page := v2Request(t, server, http.MethodGet, "/?view=series&series=Show", nil)
 	if code != http.StatusOK || !strings.Contains(page, `hx-post="/subtitles/search"`) {
 		t.Fatalf("series page -> %d: %s", code, page)
+	}
+}
+
+func TestSubtitleReleaseSimilarityIgnoresSeparatorsAndExtension(t *testing.T) {
+	if got := subtitleReleaseSimilarity("Show.S01E02.1080p.WEB-DL.x264-GROUP.mkv", "show s01e02 1080p web dl x264 group"); got != 100 {
+		t.Fatalf("same normalized release = %d, want 100", got)
+	}
+	if got := subtitleReleaseSimilarity("Show.S01E02.1080p.WEB-DL.x264-GROUP.mkv", "Show.S01E02.2160p.WEB-DL.x265-OTHER"); got < 65 {
+		t.Fatalf("closely related releases = %d, want a strong similarity", got)
+	}
+	if got := subtitleReleaseSimilarity("Show.S01E02.mkv", "Different.Movie.2020.mkv"); got > 30 {
+		t.Fatalf("unrelated releases = %d, want a low similarity", got)
+	}
+}
+
+func TestSubtitleCandidateScoreUsesSimilarityAndReputation(t *testing.T) {
+	trusted, untrusted := true, false
+	ai, human := true, false
+	base := subtitleCandidate{ReleaseSimilarity: 90, FromTrusted: &trusted, AITranslated: &human, MachineTranslated: &human, DownloadCount: 5000}
+	if base.Score != 0 {
+		t.Fatal("test fixture must start without a precomputed score")
+	}
+	strong := subtitleCandidateScore(base)
+	weak := subtitleCandidateScore(subtitleCandidate{ReleaseSimilarity: 20, FromTrusted: &untrusted, AITranslated: &ai, MachineTranslated: &ai})
+	if strong <= weak || strong < 55 {
+		t.Fatalf("strong=%d weak=%d, want the similar trusted human subtitle first", strong, weak)
+	}
+	exact := subtitleCandidateScore(subtitleCandidate{HashMatch: true, SizeMatch: true, ExternalIDMatch: true, ReleaseSimilarity: 100})
+	if exact != 100 {
+		t.Fatalf("exact match score = %d, want 100", exact)
+	}
+}
+
+func TestSubtitleLanguagesFilter(t *testing.T) {
+	languages, err := subtitleLanguagesFilter("all")
+	if err != nil || languages != nil {
+		t.Fatalf("all languages = %v, %v", languages, err)
+	}
+	languages, err = subtitleLanguagesFilter("ita,en,eng")
+	if err != nil || len(languages) != 2 || languages[0] != "it" || languages[1] != "en" {
+		t.Fatalf("mapped languages = %v, %v", languages, err)
+	}
+	if _, err := subtitleLanguagesFilter("not-a-language"); err == nil {
+		t.Fatal("an invalid language filter must be refused")
+	}
+}
+
+func TestSubtitleSearchBrowsesAllLanguagesAndMarksBestPerLanguage(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/subtitles" {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("languages"); got != "" {
+			t.Errorf("all-language search sent languages=%q", got)
+		}
+		_, _ = io.WriteString(w, `{"data":[
+			{"attributes":{"language":"it","release":"Show.S01E01.1080p.WEB-DL.x264-GROUP","files":[{"file_id":20}],"from_trusted":true,"ai_translated":false,"machine_translated":false,"download_count":5000}},
+			{"attributes":{"language":"it","release":"Show.S01E01.2160p.WEB-DL.x265-OTHER","files":[{"file_id":21}],"from_trusted":false,"ai_translated":true,"machine_translated":true,"download_count":90000}},
+			{"attributes":{"language":"en","release":"Show.S01E01.1080p.WEB-DL.x264-GROUP","files":[{"file_id":22}],"from_trusted":true,"ai_translated":false,"machine_translated":false,"download_count":4000}}
+		]}`)
+	}))
+	defer server.Close()
+	cfg := latestConfig(state)
+	cfg.Settings[subtitleSettingEnabled] = "true"
+	cfg.Settings[subtitleSettingProviderURL] = server.URL
+	cfg.Settings[subtitleSettingAPIKey] = "key"
+	client, prefs, err := subtitleProviderClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := subtitleTarget{Kind: "episode", VideoPath: filepath.Join(t.TempDir(), "Show.S01E01.1080p.WEB-DL.x264-GROUP.mkv"), Title: "Show", Season: 1, Episode: 1}
+	candidates, err := searchSubtitleCandidatesWithLanguages(context.Background(), client, prefs, cfg, state.db, target, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 3 {
+		t.Fatalf("candidates = %+v", candidates)
+	}
+	if candidates[0].Language != "it" || !candidates[0].Recommended || candidates[0].ReleaseSimilarity != 100 {
+		t.Fatalf("best Italian candidate = %+v", candidates[0])
+	}
+	if candidates[1].Language != "en" || !candidates[1].Recommended {
+		t.Fatalf("best English candidate = %+v", candidates[1])
+	}
+	if candidates[2].Recommended || !candidates[2].IsAITranslated() {
+		t.Fatalf("weaker Italian candidate = %+v", candidates[2])
+	}
+}
+
+type fakeSubtitleTorrentEngine struct {
+	view   models.TorrentView
+	files  []models.FileView
+	ok     bool
+	err    error
+	called string
+}
+
+func (f *fakeSubtitleTorrentEngine) List() []models.TorrentView { return []models.TorrentView{f.view} }
+func (f *fakeSubtitleTorrentEngine) Files(hash string) ([]models.FileView, bool, error) {
+	f.called = hash
+	return f.files, f.ok, f.err
+}
+
+func TestResolveSubtitleTorrentTargetUsesSelectedFileAndAllowsIncomplete(t *testing.T) {
+	state := newTestAppState(t)
+	root := t.TempDir()
+	relative := filepath.Join("pack", "Show.S01E03.1080p.WEB-DL.x264-GROUP.mkv")
+	video := filepath.Join(root, relative)
+	if err := os.MkdirAll(filepath.Dir(video), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(video, make([]byte, 256<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("a", 40)
+	series, season, sentinel := "Show", int64(1), int64(0)
+	release := models.Release{Title: "Show.S01", Magnet: "magnet:?xt=urn:btih:" + hash, InfoHash: hash, Source: manualSource, Kind: "series", Series: &series, Season: &season, Episode: &sentinel, EpisodeRange: []int64{0}, IsPack: true}
+	if err := state.db.RegisterTorrentScored(&release, 1); err != nil {
+		t.Fatal(err)
+	}
+	engine := &fakeSubtitleTorrentEngine{
+		view:  models.TorrentView{Hash: hash, Name: "Show.S01", SavePath: root, Progress: 0.5},
+		files: []models.FileView{{Path: relative, Size: 256 << 10, Downloaded: 256 << 10, Priority: 1}},
+		ok:    true,
+	}
+	target, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.VideoPath != video || target.Series != "Show" || target.Season != 1 || target.Episode != 3 || !target.FileComplete || len(target.OSHash) != 16 {
+		t.Fatalf("complete target = %+v", target)
+	}
+	if target.TorrentHash != hash || target.FileIndex == nil || *target.FileIndex != 0 || target.ReferenceName != "Show.S01" || engine.called != hash {
+		t.Fatalf("torrent identity = %+v, called=%q", target, engine.called)
+	}
+	engine.files[0].Downloaded = 0
+	target, err = resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.FileComplete || target.OSHash != "" || target.SizeBytes != 0 || target.Episode != 3 {
+		t.Fatalf("incomplete target = %+v", target)
+	}
+}
+
+func TestResolveSubtitleTorrentTargetParsesRawManualName(t *testing.T) {
+	state := newTestAppState(t)
+	root := t.TempDir()
+	relative := filepath.Join("Season 02", "Show.S02E04.mkv")
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, relative)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, relative), make([]byte, 256<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("b", 40)
+	engine := &fakeSubtitleTorrentEngine{
+		view:  models.TorrentView{Hash: hash, Name: "S02", SavePath: root},
+		files: []models.FileView{{Path: relative, Size: 256 << 10, Downloaded: 0, Priority: 1}},
+		ok:    true,
+	}
+	target, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Kind != "episode" || target.Title != "Show" || target.Season != 2 || target.Episode != 4 || target.FileComplete {
+		t.Fatalf("raw target = %+v", target)
+	}
+}
+
+func TestResolveSubtitleTorrentTargetRejectsUnsafeOrAmbiguousFile(t *testing.T) {
+	state := newTestAppState(t)
+	root := t.TempDir()
+	hash := strings.Repeat("c", 40)
+	for _, relative := range []string{"../outside.mkv", "/absolute.mkv", `..\outside.mkv`, "Show.S01E01-E02.mkv"} {
+		engine := &fakeSubtitleTorrentEngine{
+			view:  models.TorrentView{Hash: hash, Name: "Show.S01", SavePath: root},
+			files: []models.FileView{{Path: relative, Size: 256 << 10, Downloaded: 0, Priority: 1}},
+			ok:    true,
+		}
+		if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0); err == nil {
+			t.Fatalf("path %q was accepted", relative)
+		}
+	}
+	engine := &fakeSubtitleTorrentEngine{
+		view:  models.TorrentView{Hash: hash, Name: "Show.S01", SavePath: root},
+		files: []models.FileView{{Path: "Show.S01E01.mkv", Size: 256 << 10, Downloaded: 0, Priority: 1}},
+		ok:    true,
+	}
+	if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 1); err == nil {
+		t.Fatal("an out-of-range file index was accepted")
+	}
+}
+
+func TestResolveSubtitleTorrentTargetRejectsSymlinksAndWrongCompleteSize(t *testing.T) {
+	state := newTestAppState(t)
+	root, outside := t.TempDir(), t.TempDir()
+	hash := strings.Repeat("f", 40)
+	outsideVideo := filepath.Join(outside, "Show.S01E01.mkv")
+	if err := os.WriteFile(outsideVideo, make([]byte, 256<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideVideo, filepath.Join(root, "Show.S01E01.mkv")); err != nil {
+		t.Fatal(err)
+	}
+	engine := &fakeSubtitleTorrentEngine{
+		view:  models.TorrentView{Hash: hash, Name: "Show.S01", SavePath: root},
+		files: []models.FileView{{Path: "Show.S01E01.mkv", Size: 256 << 10, Downloaded: 0, Priority: 1}},
+		ok:    true,
+	}
+	if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0); err == nil {
+		t.Fatal("a final symlink was accepted")
+	}
+	if err := os.Remove(filepath.Join(root, "Show.S01E01.mkv")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	engine.files[0].Path = "linked/Show.S01E01.mkv"
+	if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0); err == nil {
+		t.Fatal("a directory symlink escaping the save root was accepted")
+	}
+	if err := os.Remove(filepath.Join(root, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Show.S01E01.mkv"), make([]byte, 128<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine.files[0] = models.FileView{Path: "Show.S01E01.mkv", Size: 256 << 10, Downloaded: 256 << 10, Priority: 1}
+	if _, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0); err == nil {
+		t.Fatal("a complete file whose disk size differs from the torrent was accepted")
+	}
+}
+
+func TestResolveSubtitleTorrentTargetParsesRawManualMovie(t *testing.T) {
+	state := newTestAppState(t)
+	root := t.TempDir()
+	hash := strings.Repeat("1", 40)
+	engine := &fakeSubtitleTorrentEngine{
+		view:  models.TorrentView{Hash: hash, Name: "Example.Movie.2024.1080p", SavePath: root},
+		files: []models.FileView{{Path: "Example.Movie.2024.mkv", Size: 256 << 10, Downloaded: 0, Priority: 1}},
+		ok:    true,
+	}
+	target, err := resolveSubtitleTorrentTarget(context.Background(), latestConfig(state), state.db, engine, hash, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.Kind != "movie" || target.Title != "Example.Movie.2024.1080p" || target.Year != 2024 {
+		t.Fatalf("raw movie target = %+v", target)
 	}
 }

@@ -513,7 +513,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			Title: "Sottotitoli", Hint: "Provider OpenSubtitles-compatibile. La ricerca mostra un'anteprima; il file viene scritto solo quando confermi.", Path: "/api/subtitles/settings", Submit: "Salva sottotitoli",
 			TestPath: "/subtitles/test", TestLabel: "Test connessione", TestHint: "Verifica API key e accesso al provider senza salvare le modifiche.",
 			Fields: []uiFormField{
-				boolFieldHint("enabled", "Abilita sottotitoli", "Mostra il pulsante di ricerca sulle schede di episodi e film.", settingsBool(cfg, subtitleSettingEnabled, false)),
+				boolFieldHint("enabled", "Abilita sottotitoli", "Mostra la ricerca dei sottotitoli su episodi, film e dettagli dei torrent.", settingsBool(cfg, subtitleSettingEnabled, false)),
 				{Name: "provider_url", Label: "URL provider", Value: settingsOr(cfg, subtitleSettingProviderURL, subtitleprovider.DefaultBaseURL), Hint: "Indirizzo API compatibile con OpenSubtitles REST."},
 				{Name: "api_key", Label: "API key", Kind: "secret", Hint: "Lascia vuoto per mantenere la chiave salvata."},
 				{Name: "username", Label: "Utente", Value: settingsOr(cfg, subtitleSettingUsername, ""), Hint: "Facoltativo: senza account si usa l'accesso anonimo con API key."},

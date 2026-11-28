@@ -943,6 +943,7 @@ and the sheet scrolls inside itself. The tabs:
 | **General** | torrent data (the magnet shows its first three lines), copy magnet, **Export .torrent**, reannounce, pin, restart, mark as failed, **Super seeding**, web seeds |
 | **Tracker** | add trackers (`tier\|url` per line) or remove one; each one shows its state, failures, seeds and peers, **how long the last announce took** to be answered and the **median** of the recent ones, so a slow tracker is told from a slow line; **waiting** marks the announce that is awaiting its reply. At the top, how many announces are in flight and the median across the trackers |
 | **Content** | the files, with **priority** (Skip, Normal, High, Maximum) and, with gx-torrent, **▶** for streaming |
+| **Subtitles** | when the provider is active, choose the video file, filter by language and find the available subtitles; it shows matching, reputation and score, even while the file is downloading |
 | **Peers** | the connected peers; with gx-torrent the peer's **country** sits next to its address, from the DB-IP database gx-torrent downloads by itself |
 | **Pieces** | the piece map: green downloaded, yellow in progress, grey missing. With gx-torrent, below it is the **availability among peers**: the fuller the bar, the more connected peers have the pieces you are missing; red marks pieces no connected peer has. With qBittorrent there is the map only, and the pieces of skipped files show as missing |
 | **Speed** | that torrent's download and upload chart over the last 30 minutes, with average and peak. Gextto records the speed of the torrents that are transferring only, so the chart is already there when you open the tab |
@@ -1761,6 +1762,19 @@ those results stay in the manual preview. An existing subtitle, in the language
 and with the forced/SDH variants you asked for, is never touched, and a title
 with no result is left alone for a while before it is tried again. If you list more than one language, for
 example `ita,eng`, it looks for one of each.
+
+Even when you have not asked for subtitles on the title, an active provider adds
+a **Subtitles** tab to a torrent's details. Choose the **video file** — for a pack,
+the individual episode — and the **subtitle language**; **All languages** shows
+the complete list, or you can filter to one language. The search starts only when
+you press **Find subtitles** and writes no file. For a movie or episode recognised
+from metadata or from the torrent/file name, the list shows release-name
+similarity, hash, size and external-ID matches, trusted/AI badges and the download
+count. The **score** combines these signals and marks a **Recommended** choice
+per language; it is not a measurement of the subtitle's technical quality. While
+a file is incomplete, the search uses identity and name similarity without
+presenting the final hash or size as known. A file holding several episodes is
+refused until you choose one unambiguous episode.
 
 On an archived episode or downloaded movie, **Find subtitles** opens a preview
 with language, release, match reason and proposed filename. Preview downloads

@@ -49,6 +49,7 @@ Playwright with axe-core, `uiweb/end2end/tests/accessibility.spec.ts`:
 - dialogs keep the focus and return it on close;
 - polling does not lose the focus on the torrent control;
 - the release search works from the keyboard;
+- the subtitle search has labelled file/language controls, announced results and an axe-clean table;
 - no horizontal scroll at 320 px;
 - scrollable log areas are keyboard reachable and have a region role.
 
@@ -57,7 +58,7 @@ Run the suite:
 ```bash
 cd uiweb/end2end
 npm ci
-npm run test:a11y        # 14 tests
+npm run test:a11y        # 21 tests
 ```
 
 The CI job `ui-e2e` runs the whole Playwright suite on every push, so a regression on

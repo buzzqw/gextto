@@ -93,7 +93,7 @@ maintenance, health, the gx-torrent page and the other languages — are in the
 | | |
 |---|---|
 | ![Bandwidth menu](docs/screenshots/en/bandwidth.png) | ![Torrent details, piece map](docs/screenshots/en/detail.png) |
-| **Bandwidth.** What applies now and where it comes from; an exception for now, Auto or a limit, in one click. | **Torrent details.** General, trackers, content, peers, the piece map, limits and storage. |
+| **Bandwidth.** What applies now and where it comes from; an exception for now, Auto or a limit, in one click. | **Torrent details.** General, trackers, content, subtitles, peers, the piece map, limits and storage. |
 | ![Dashboard](docs/screenshots/en/dashboard.png) | ![Speed rule in the settings](docs/screenshots/en/speed-rule.png) |
 | **Dashboard.** Load, network and space in a strip of live figures, what is downloading now with its poster, the traffic, the health, the week's releases and what needs checking. | **Settings.** One choice for the speed rule; the rows that depend on it appear only when they matter. |
 

@@ -109,6 +109,30 @@ test.describe("accessibilità automatizzata", () => {
     await expect(page.locator("#v2-search-results")).toContainText("Test release");
   });
 
+  test("la ricerca sottotitoli ha filtri etichettati e risultati annunciati", async ({ page }) => {
+    await page.goto("/?view=downloads");
+    await page.evaluate(() => {
+      const drawer = document.getElementById("v2-detail-drawer");
+      drawer.hidden = false;
+      drawer.innerHTML = `<form>
+        <label for="subtitle-video">File video</label>
+        <select id="subtitle-video" name="file_index"><option value="0">Show.S01E01.mkv</option></select>
+        <label for="subtitle-language">Lingua sottotitolo</label>
+        <select id="subtitle-language" name="languages"><option value="all">Tutte le lingue</option><option value="it">Italiano</option></select>
+        <button type="submit">Cerca sottotitoli</button>
+      </form><div id="v2-detail-subtitle-results" aria-live="polite"><p role="status">Sottotitoli per Show S01E01</p>
+        <div class="table-wrap"><table class="data-table">
+          <caption class="sr-only">Sottotitoli trovati</caption>
+          <thead><tr><th scope="col">Lingua</th><th scope="col">Release</th><th scope="col">Punteggio</th></tr></thead>
+          <tbody><tr><td>Italiano</td><td>Show.S01E01</td><td>90/100</td></tr></tbody>
+        </table></div>
+      </div>`;
+    });
+    await expect(page.locator("#v2-detail-subtitle-results")).toContainText("Show.S01E01");
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+    expect(results.violations).toEqual([]);
+  });
+
   test("il layout non richiede scorrimento orizzontale a 320px", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto("/");

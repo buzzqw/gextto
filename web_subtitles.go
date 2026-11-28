@@ -138,7 +138,7 @@ func SubtitleSettingsView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{
 		"enabled": prefs.Enabled, "provider_url": prefs.ProviderURL,
 		"username": prefs.Username,
-		"forced": prefs.Forced, "sdh": prefs.SDH, "collision_policy": prefs.Collision,
+		"forced":   prefs.Forced, "sdh": prefs.SDH, "collision_policy": prefs.Collision,
 		"api_key_configured": prefs.APIKey != "", "password_configured": prefs.Password != "",
 	})
 }
@@ -163,16 +163,51 @@ type subtitleSearchResponse struct {
 
 func SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	series := strings.TrimSpace(r.URL.Query().Get("series"))
-	season, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("season")), 10, 64)
-	episode, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("episode")), 10, 64)
-	movieID, _ := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("movie_id")), 10, 64)
-	target, err := resolveSubtitleTarget(r.Context(), cfg, s.db, series, season, episode, movieID)
+	query := r.URL.Query()
+	series := strings.TrimSpace(query.Get("series"))
+	season, _ := strconv.ParseInt(strings.TrimSpace(query.Get("season")), 10, 64)
+	episode, _ := strconv.ParseInt(strings.TrimSpace(query.Get("episode")), 10, 64)
+	movieID, _ := strconv.ParseInt(strings.TrimSpace(query.Get("movie_id")), 10, 64)
+	torrentHash := strings.TrimSpace(query.Get("torrent_hash"))
+	var target subtitleTarget
+	var err error
+	if torrentHash != "" {
+		if series != "" || season != 0 || episode != 0 || movieID != 0 {
+			jsonError(w, http.StatusBadRequest, "choose either an archived title or an active torrent")
+			return
+		}
+		rawIndex, present := query["file_index"]
+		if !present || len(rawIndex) != 1 {
+			jsonError(w, http.StatusBadRequest, "file_index is required for an active torrent")
+			return
+		}
+		fileIndex, parseErr := strconv.Atoi(strings.TrimSpace(rawIndex[0]))
+		if parseErr != nil || fileIndex < 0 {
+			jsonError(w, http.StatusBadRequest, "file_index must be a non-negative integer")
+			return
+		}
+		target, err = resolveSubtitleTorrentTarget(r.Context(), cfg, s.db, s.activeEngine(), torrentHash, fileIndex)
+	} else {
+		target, err = resolveSubtitleTarget(r.Context(), cfg, s.db, series, season, episode, movieID)
+	}
 	if err != nil {
 		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	candidates, err := searchSubtitleCandidates(r.Context(), cfg, s.db, target)
+	languages := subtitleLanguagesFor(cfg, target)
+	if torrentHash != "" && strings.TrimSpace(query.Get("languages")) == "" {
+		// Browsing an active download starts with every language; the archived
+		// title modal keeps its existing title preference.
+		languages = nil
+	}
+	if raw := strings.TrimSpace(query.Get("languages")); raw != "" {
+		languages, err = subtitleLanguagesFilter(raw)
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	candidates, err := searchSubtitleCandidatesForLanguages(r.Context(), cfg, s.db, target, languages)
 	if err != nil {
 		status := http.StatusBadGateway
 		if strings.Contains(err.Error(), "disabled") {

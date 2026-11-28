@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/buzzqw/gextto/internal/constants"
@@ -134,6 +135,28 @@ func subtitleProviderLanguage(raw string) string {
 	return ""
 }
 
+// subtitleLanguagesFilter parses the browser's explicit language filter. Nil
+// means every language; an empty or "all" value is the same choice.
+func subtitleLanguagesFilter(raw string) ([]string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || strings.EqualFold(raw, "all") {
+		return nil, nil
+	}
+	languages := []string{}
+	seen := map[string]bool{}
+	for _, item := range strings.Split(raw, ",") {
+		code := subtitleProviderLanguage(item)
+		if code == "" {
+			return nil, fmt.Errorf("unsupported subtitle language %q", strings.TrimSpace(item))
+		}
+		if !seen[code] {
+			seen[code] = true
+			languages = append(languages, code)
+		}
+	}
+	return languages, nil
+}
+
 func subtitleLanguageSuffix(raw string) string {
 	code := strings.ToLower(strings.TrimSpace(raw))
 	if mapped := subtitleProviderToLanguage[code]; mapped != "" {
@@ -160,6 +183,10 @@ type subtitleTarget struct {
 	Year               int    `json:"year,omitempty"`
 	TMDBID             string `json:"tmdb_id,omitempty"`
 	SubtitlePreference string `json:"subtitle_preference,omitempty"`
+	ReferenceName      string `json:"reference_name,omitempty"`
+	TorrentHash        string `json:"torrent_hash,omitempty"`
+	FileIndex          *int   `json:"file_index,omitempty"`
+	FileComplete       bool   `json:"file_complete"`
 }
 
 func resolveSubtitleTarget(ctx context.Context, cfg *Config, db *Database, seriesName string, season, episode, movieID int64) (subtitleTarget, error) {
@@ -236,6 +263,7 @@ func resolveSubtitleTarget(ctx context.Context, cfg *Config, db *Database, serie
 		return target, err
 	}
 	target.VideoPath, target.OSHash, target.SizeBytes = path, hash, size
+	target.FileComplete = true
 	if probe, err := probeFileWithinContext(ctx, path, 15*time.Second); err == nil {
 		target.RuntimeSeconds = probe.RuntimeSeconds
 	}
@@ -260,29 +288,167 @@ func subtitleVideoExtension(path string) bool {
 }
 
 type subtitleCandidate struct {
-	FileID        int64    `json:"file_id"`
-	Language      string   `json:"language"`
-	Release       string   `json:"release"`
-	HashMatch     bool     `json:"hash_match"`
-	SizeMatch     bool     `json:"size_match"`
-	Forced        *bool    `json:"forced,omitempty"`
-	SDH           *bool    `json:"sdh,omitempty"`
-	DownloadCount int      `json:"download_count"`
-	ProposedName  string   `json:"proposed_name"`
-	Reasons       []string `json:"reasons"`
+	FileID            int64    `json:"file_id"`
+	Language          string   `json:"language"`
+	Release           string   `json:"release"`
+	HashMatch         bool     `json:"hash_match"`
+	SizeMatch         bool     `json:"size_match"`
+	ExternalIDMatch   bool     `json:"external_id_match"`
+	Forced            *bool    `json:"forced,omitempty"`
+	SDH               *bool    `json:"sdh,omitempty"`
+	FromTrusted       *bool    `json:"from_trusted,omitempty"`
+	AITranslated      *bool    `json:"ai_translated,omitempty"`
+	MachineTranslated *bool    `json:"machine_translated,omitempty"`
+	DownloadCount     int      `json:"download_count"`
+	ReleaseSimilarity int      `json:"release_similarity"`
+	Score             int      `json:"score"`
+	Recommended       bool     `json:"recommended"`
+	ProposedName      string   `json:"proposed_name"`
+	Reasons           []string `json:"reasons"`
 }
 
 func subtitleBool(value *bool) bool { return value != nil && *value }
 
-func (c subtitleCandidate) IsForced() bool { return subtitleBool(c.Forced) }
-func (c subtitleCandidate) IsSDH() bool    { return subtitleBool(c.SDH) }
+func (c subtitleCandidate) IsForced() bool            { return subtitleBool(c.Forced) }
+func (c subtitleCandidate) IsSDH() bool               { return subtitleBool(c.SDH) }
+func (c subtitleCandidate) IsTrusted() bool           { return subtitleBool(c.FromTrusted) }
+func (c subtitleCandidate) IsAITranslated() bool      { return subtitleBool(c.AITranslated) }
+func (c subtitleCandidate) IsMachineTranslated() bool { return subtitleBool(c.MachineTranslated) }
+
+// subtitleCandidateScore combines how precisely the provider matched the video
+// with the reputation signals it exposes. It deliberately does not claim to
+// measure subtitle content quality: no candidate is downloaded for this score.
+func subtitleCandidateScore(candidate subtitleCandidate) int {
+	score := 10 // the provider returned it for the requested title/episode identity
+	score += candidate.ReleaseSimilarity * 30 / 100
+	if candidate.HashMatch {
+		score += 45
+	}
+	if candidate.SizeMatch {
+		score += 10
+	}
+	if candidate.ExternalIDMatch {
+		score += 10
+	}
+	if candidate.IsTrusted() {
+		score += 10
+	}
+	if candidate.AITranslated != nil && !*candidate.AITranslated && candidate.MachineTranslated != nil && !*candidate.MachineTranslated {
+		score += 5
+	}
+	if candidate.DownloadCount > 0 {
+		// Ten points at 100,000 downloads, with diminishing returns before that.
+		score += int(math.Round(10 * math.Log1p(float64(candidate.DownloadCount)) / math.Log1p(100000)))
+	}
+	if candidate.IsAITranslated() {
+		score -= 15
+	}
+	if candidate.IsMachineTranslated() {
+		score -= 10
+	}
+	if score < 0 {
+		return 0
+	}
+	if score > 100 {
+		return 100
+	}
+	return score
+}
+
+// subtitleReleaseSimilarity compares the names an operator recognises, not
+// provider IDs. Punctuation, separators and the media extension are ignored;
+// the remaining edit similarity is bounded so a hostile provider cannot make
+// the request spend unbounded CPU.
+func subtitleReleaseSimilarity(names ...string) int {
+	if len(names) == 0 {
+		return 0
+	}
+	candidate := normalizeSubtitleReleaseName(names[len(names)-1])
+	if candidate == "" {
+		return 0
+	}
+	best := 0
+	for _, name := range names[:len(names)-1] {
+		reference := normalizeSubtitleReleaseName(name)
+		if reference == "" {
+			continue
+		}
+		if reference == candidate {
+			return 100
+		}
+		longest := utf8.RuneCountInString(reference)
+		if count := utf8.RuneCountInString(candidate); count > longest {
+			longest = count
+		}
+		distance := subtitleEditDistance(reference, candidate)
+		similarity := 100 - distance*100/longest
+		if similarity > best {
+			best = similarity
+		}
+	}
+	return best
+}
+
+func normalizeSubtitleReleaseName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	switch filepath.Ext(name) {
+	case ".mkv", ".mp4", ".avi", ".m4v", ".mov", ".ts", ".wmv", ".mpeg", ".mpg":
+		name = strings.TrimSuffix(name, filepath.Ext(name))
+	}
+	normalized := strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return r
+		}
+		return -1
+	}, name)
+	runes := []rune(normalized)
+	if len(runes) > 512 {
+		runes = runes[:512]
+	}
+	return string(runes)
+}
+
+func subtitleEditDistance(left, right string) int {
+	a, b := []rune(left), []rune(right)
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	previous := make([]int, len(a)+1)
+	current := make([]int, len(a)+1)
+	for index := range previous {
+		previous[index] = index
+	}
+	for row, rightRune := range b {
+		current[0] = row + 1
+		for column, leftRune := range a {
+			cost := 0
+			if leftRune != rightRune {
+				cost = 1
+			}
+			value := previous[column+1] + 1
+			if deletion := previous[column] + 1; deletion < value {
+				value = deletion
+			}
+			if substitution := previous[column] + cost; substitution < value {
+				value = substitution
+			}
+			current[column+1] = value
+		}
+		previous, current = current, previous
+	}
+	return previous[len(a)]
+}
 
 func searchSubtitleCandidates(ctx context.Context, cfg *Config, db *Database, target subtitleTarget) ([]subtitleCandidate, error) {
+	return searchSubtitleCandidatesForLanguages(ctx, cfg, db, target, subtitleLanguagesFor(cfg, target))
+}
+
+func searchSubtitleCandidatesForLanguages(ctx context.Context, cfg *Config, db *Database, target subtitleTarget, languages []string) ([]subtitleCandidate, error) {
 	client, prefs, err := subtitleProviderClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return searchSubtitleCandidatesWith(ctx, client, prefs, cfg, db, target)
+	return searchSubtitleCandidatesWithLanguages(ctx, client, prefs, cfg, db, target, languages)
 }
 
 // subtitleEpisodeNumber narrows a season or episode number for the provider
@@ -299,7 +465,13 @@ func subtitleEpisodeNumber(value int64) int {
 // caller already holds: the automatic pass shares one client, and so one
 // provider login, across all its searches and downloads.
 func searchSubtitleCandidatesWith(ctx context.Context, client *subtitleprovider.Client, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget) ([]subtitleCandidate, error) {
-	languages := subtitleLanguagesFor(cfg, target)
+	return searchSubtitleCandidatesWithLanguages(ctx, client, prefs, cfg, db, target, subtitleLanguagesFor(cfg, target))
+}
+
+// searchSubtitleCandidatesWithLanguages accepts nil to browse every provider
+// language. The automatic pass and the archived-title modal keep their title
+// preference; the active-torrent browser uses nil unless a language is chosen.
+func searchSubtitleCandidatesWithLanguages(ctx context.Context, client *subtitleprovider.Client, prefs subtitlePreferences, cfg *Config, db *Database, target subtitleTarget, languages []string) ([]subtitleCandidate, error) {
 	kind := "episode"
 	if target.Kind == "movie" {
 		kind = "movie"
@@ -319,7 +491,10 @@ func searchSubtitleCandidatesWith(ctx context.Context, client *subtitleprovider.
 	candidates := []subtitleCandidate{}
 	for _, result := range results {
 		language := strings.ToLower(result.Language)
-		if !allowed[language] {
+		if language == "" {
+			continue
+		}
+		if len(allowed) > 0 && !allowed[language] {
 			continue
 		}
 		forced := result.ForeignPartsOnly
@@ -342,26 +517,42 @@ func searchSubtitleCandidatesWith(ctx context.Context, client *subtitleprovider.
 		}
 		reasons := []string{}
 		if result.HashMatch {
-			reasons = append(reasons, "exact file hash")
+			reasons = append(reasons, "hash file esatto")
 		}
 		if result.SizeMatch {
-			reasons = append(reasons, "exact size")
+			reasons = append(reasons, "dimensione esatta")
 		}
-		if target.TMDBID != "" && result.IMDbMatch {
-			reasons = append(reasons, "external id")
+		if result.IMDbMatch {
+			reasons = append(reasons, "ID esterno")
+		}
+		if result.FromTrusted != nil && *result.FromTrusted {
+			reasons = append(reasons, "autore attendibile")
+		}
+		if result.AITranslated != nil && *result.AITranslated {
+			reasons = append(reasons, "tradotto con AI")
+		}
+		if result.MachineTranslated != nil && *result.MachineTranslated {
+			reasons = append(reasons, "traduzione automatica")
 		}
 		if len(reasons) == 0 {
-			reasons = append(reasons, "title and episode/movie identity")
+			reasons = append(reasons, "titolo e identità episodio/film")
 		}
 		name := subtitleSidecarName(target.VideoPath, language, subtitleBool(forced), subtitleBool(sdh))
-		candidates = append(candidates, subtitleCandidate{
+		similarity := subtitleReleaseSimilarity(filepath.Base(target.VideoPath), target.ReferenceName, result.Release())
+		candidate := subtitleCandidate{
 			FileID: int64(file.ID), Language: language, Release: result.Release(), HashMatch: result.HashMatch,
-			SizeMatch: result.SizeMatch, Forced: forced, SDH: sdh, DownloadCount: result.DownloadCount,
-			ProposedName: name, Reasons: reasons,
-		})
+			SizeMatch: result.SizeMatch, ExternalIDMatch: result.IMDbMatch, Forced: forced, SDH: sdh,
+			FromTrusted: result.FromTrusted, AITranslated: result.AITranslated, MachineTranslated: result.MachineTranslated,
+			DownloadCount: result.DownloadCount, ReleaseSimilarity: similarity, ProposedName: name, Reasons: reasons,
+		}
+		candidate.Score = subtitleCandidateScore(candidate)
+		candidates = append(candidates, candidate)
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
 		left, right := candidates[i], candidates[j]
+		if left.Score != right.Score {
+			return left.Score > right.Score
+		}
 		if left.HashMatch != right.HashMatch {
 			return left.HashMatch
 		}
@@ -371,10 +562,24 @@ func searchSubtitleCandidatesWith(ctx context.Context, client *subtitleprovider.
 		if left.DownloadCount != right.DownloadCount {
 			return left.DownloadCount > right.DownloadCount
 		}
+		if left.Language != right.Language {
+			return left.Language < right.Language
+		}
 		return left.Release < right.Release
 	})
 	if len(candidates) > 50 {
 		candidates = candidates[:50]
+	}
+	// One useful default per language, but never recommend a weak title-only
+	// match. The operator still sees and chooses every other candidate.
+	bestByLanguage := map[string]bool{}
+	for index := range candidates {
+		candidate := &candidates[index]
+		if candidate.Score < 40 || bestByLanguage[candidate.Language] {
+			continue
+		}
+		candidate.Recommended = true
+		bestByLanguage[candidate.Language] = true
 	}
 	return candidates, nil
 }

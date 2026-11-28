@@ -2248,6 +2248,8 @@ type v2DetailView struct {
 	// Speed is the Speed tab's chart of this torrent.
 	Speed v2TorrentSpeedView
 	Error string
+	// Subtitles is the active-torrent subtitle browser state.
+	Subtitles v2TorrentSubtitlesView
 	// TabError explains why a tab is empty (engine unreachable, unsupported).
 	TabError string
 	// Notice is the toast shown after a detail action: saving a tab must not
@@ -2385,11 +2387,21 @@ func v2UnixTimeLabel(seconds int64) string {
 
 func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	view := v2DetailView{Hash: hash, Tab: tab, Caps: v2DetailCapsFor(s.activeEngine().Name())}
+	view.Subtitles.Hash = hash
+	view.Subtitles.Languages = "all"
+	view.Subtitles.LanguageOptions = v2SubtitleLanguages("all")
+	view.Subtitles.Enabled = settingTruthy(latestConfig(s).Settings[subtitleSettingEnabled])
 	view.Tabs = []v2DetailTab{
 		{ID: "general", Label: "Generale"}, {ID: "trackers", Label: "Tracker"},
-		{ID: "files", Label: "Contenuto"}, {ID: "peers", Label: "Peers"},
-		{ID: "limits", Label: "Limiti"}, {ID: "storage", Label: "Storage"},
+		{ID: "files", Label: "Contenuto"},
 	}
+	if view.Subtitles.Enabled {
+		view.Tabs = append(view.Tabs, v2DetailTab{ID: "subtitles", Label: "Sottotitoli"})
+	}
+	view.Tabs = append(view.Tabs,
+		v2DetailTab{ID: "peers", Label: "Peers"}, v2DetailTab{ID: "limits", Label: "Limiti"},
+		v2DetailTab{ID: "storage", Label: "Storage"},
+	)
 	// The per-piece tab needs both the matrix (piece_diagnostics) and the
 	// engine's implementation, so the API and the UI never disagree.
 	if view.Caps.Pieces {
@@ -2552,6 +2564,13 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		view.AnnounceMedianMs = v2MedianInt64(medians)
 	case "files":
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
+	case "subtitles":
+		if view.Subtitles.Enabled {
+			view.Subtitles.Files, tabErr = v2SubtitleVideoFiles(s, hash)
+			if len(view.Subtitles.Files) > 0 {
+				view.Subtitles.FileIndex = view.Subtitles.Files[0].Index
+			}
+		}
 	case "peers":
 		view.Peers, _, tabErr = s.activeEngine().Peers(hash)
 		for _, peer := range view.Peers {

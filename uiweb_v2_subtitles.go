@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,6 +17,87 @@ type v2SubtitlesView struct {
 	AppliedPath string
 	Message     string
 	Error       bool
+}
+
+type v2SubtitleVideoFile struct {
+	Index      int
+	Path       string
+	Size       int64
+	Downloaded int64
+	Ready      bool
+}
+
+type v2SubtitleLanguageOption struct {
+	Code  string
+	Label string
+}
+
+type v2TorrentSubtitlesView struct {
+	Hash            string
+	Enabled         bool
+	Files           []v2SubtitleVideoFile
+	FileIndex       int
+	Languages       string
+	LanguageOptions []v2SubtitleLanguageOption
+	Target          subtitleTarget
+	Candidates      []subtitleCandidate
+	Message         string
+	Error           bool
+}
+
+var v2SubtitleLanguageLabels = map[string]string{
+	"ar": "العربية", "da": "Dansk", "de": "Deutsch", "en": "English", "es": "Español",
+	"fi": "Suomi", "fr": "Français", "he": "עברית", "hi": "हिन्दी", "it": "Italiano",
+	"ja": "日本語", "ko": "한국어", "nl": "Nederlands", "no": "Norsk", "pl": "Polski",
+	"pt": "Português", "ru": "Русский", "sv": "Svenska", "tr": "Türkçe", "zh": "中文",
+}
+
+func (c subtitleCandidate) LanguageLabel() string {
+	if label := v2SubtitleLanguageLabels[c.Language]; label != "" {
+		return label
+	}
+	return c.Language
+}
+
+func v2SubtitleLanguages(selected string) []v2SubtitleLanguageOption {
+	options := []v2SubtitleLanguageOption{{Code: "all", Label: "Tutte le lingue"}}
+	for _, code := range []string{"ar", "da", "de", "en", "es", "fi", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "zh"} {
+		options = append(options, v2SubtitleLanguageOption{Code: code, Label: v2SubtitleLanguageLabels[code]})
+	}
+	if selected != "" && selected != "all" {
+		known := false
+		for _, option := range options {
+			if option.Code == selected {
+				known = true
+				break
+			}
+		}
+		if !known {
+			options = append(options, v2SubtitleLanguageOption{Code: selected, Label: selected})
+		}
+	}
+	return options
+}
+
+func v2SubtitleVideoFiles(s *AppState, hash string) ([]v2SubtitleVideoFile, error) {
+	files, ok, err := s.activeEngine().Files(hash)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("il motore non può elencare i file di questo torrent")
+	}
+	videos := make([]v2SubtitleVideoFile, 0, len(files))
+	for index, file := range files {
+		if file.Priority == 0 || !subtitleVideoExtension(file.Path) || isSampleFile(file.Path) {
+			continue
+		}
+		videos = append(videos, v2SubtitleVideoFile{
+			Index: index, Path: file.Path, Size: file.Size, Downloaded: file.Downloaded,
+			Ready: file.Size > 0 && file.Downloaded >= file.Size,
+		})
+	}
+	return videos, nil
 }
 
 type v2SubtitleTestView struct {
@@ -81,13 +163,50 @@ func V2SubtitleProviderTest(w http.ResponseWriter, r *http.Request, s *AppState)
 }
 
 func V2SubtitleSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := v2SubtitlesView{Candidates: []subtitleCandidate{}}
 	query := url.Values{}
-	for _, key := range []string{"series", "season", "episode", "movie_id"} {
+	for _, key := range []string{"series", "season", "episode", "movie_id", "torrent_hash", "file_index", "languages"} {
 		if value := strings.TrimSpace(r.FormValue(key)); value != "" {
 			query.Set(key, value)
 		}
 	}
+	if torrentHash := strings.TrimSpace(r.FormValue("torrent_hash")); torrentHash != "" {
+		fileIndex, err := strconv.Atoi(strings.TrimSpace(r.FormValue("file_index")))
+		if err != nil || fileIndex < 0 {
+			v2Render(w, http.StatusOK, "v2_torrent_subtitles_results", v2TorrentSubtitlesView{
+				Hash: torrentHash, FileIndex: fileIndex, Languages: r.FormValue("languages"),
+				LanguageOptions: v2SubtitleLanguages(r.FormValue("languages")), Error: true,
+				Message: "Seleziona un file video valido.",
+			}, s)
+			return
+		}
+		languages := strings.TrimSpace(r.FormValue("languages"))
+		if languages == "" {
+			languages = "all"
+		}
+		query.Set("torrent_hash", torrentHash)
+		query.Set("file_index", strconv.Itoa(fileIndex))
+		query.Set("languages", languages)
+		view := v2TorrentSubtitlesView{
+			Hash: torrentHash, Enabled: true, FileIndex: fileIndex, Languages: languages,
+			LanguageOptions: v2SubtitleLanguages(languages), Candidates: []subtitleCandidate{},
+		}
+		raw, status := v2InternalJSON(s, http.MethodGet, "/api/subtitles/search?"+query.Encode(), nil, nil)
+		if status >= 400 {
+			view.Error, view.Message = true, v2JSONError(raw)
+			v2Render(w, http.StatusOK, "v2_torrent_subtitles_results", view, s)
+			return
+		}
+		var payload subtitleSearchResponse
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			view.Error, view.Message = true, "risposta sottotitoli non valida"
+			v2Render(w, http.StatusOK, "v2_torrent_subtitles_results", view, s)
+			return
+		}
+		view.Target, view.Candidates = payload.Target, payload.Candidates
+		v2Render(w, http.StatusOK, "v2_torrent_subtitles_results", view, s)
+		return
+	}
+	view := v2SubtitlesView{Candidates: []subtitleCandidate{}}
 	raw, status := v2InternalJSON(s, http.MethodGet, "/api/subtitles/search?"+query.Encode(), nil, nil)
 	if status >= 400 {
 		view.Error, view.Message = true, v2JSONError(raw)
